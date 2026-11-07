@@ -1,8 +1,10 @@
 -- The Dashboard: one buffer shown in the current window, polled through the
 -- Backend and drawn with `ui.render`. The buffer, its window options and the
--- poller live here; the layout lives in `ui.render` and what it takes from an
--- accepted snapshot lives in `ui.data`.
+-- poller live here; the layout lives in `ui.render`, what it takes from an
+-- accepted snapshot lives in `ui.data`, and the actions on a row live in
+-- `ui.actions`.
 
+local actions = require('rexai.ui.actions')
 local config = require('rexai.config')
 local core_git = require('rexai.core.git')
 local data = require('rexai.ui.data')
@@ -41,9 +43,9 @@ local state = {
     highlights = nil,
     targets = {},
     data = nil,
+    actions = nil,
     hooks = nil,
     show_exited = nil,
-    backend = nil,
     poller = nil,
     git = nil,
     previous_buf = nil,
@@ -328,74 +330,11 @@ local function refresh_now()
     end
 end
 
--- `<CR>`: goes to the Agent block under the cursor, or to the Session of a
--- header. Rex changes the view itself, so only a failure needs an answer:
--- the target has probably vanished, and the Dashboard asks Rex again.
-local function focus_target()
-    local target = M.current_target()
-    if not target or not state.backend then
-        return
-    end
-
-    local request = { session_id = target.session_id }
-    if target.kind == 'row' then
-        request.window_id = target.window_id
-        request.block_id = target.block_id
-    end
-
-    state.backend.focus(request, function(err)
-        if not err then
-            return
-        end
-        vim.notify('rexai: ' .. err, vim.log.levels.WARN)
-        refresh_now()
-    end)
-end
-
 -- `e`: shows or hides the Exited rows. The buffer is the feedback, and the
 -- toggle is Dashboard state, not config.
 local function toggle_exited()
     state.show_exited = not state.show_exited
     draw()
-end
-
----@param message string
----@param level integer|nil INFO unless said
-local function notify(message, level)
-    vim.notify('rexai: ' .. message, level or vim.log.levels.INFO)
-end
-
--- What `review` gets for one row: the directory it stands for, what git knows
--- about it, and the row itself.
----@param ctx rexai.RowContext
----@return table
-local function review_ctx(ctx)
-    local info = ctx.git
-    return {
-        path = ctx.path,
-        repo_root = info and info.root or nil,
-        branch = info and info.branch or nil,
-        session = { id = ctx.session.id, label = ctx.session.label },
-        window = { id = ctx.row.window_id },
-        block = vim.deepcopy(ctx.row),
-    }
-end
-
--- `d`: hands the row under the cursor to the `review` hook. A miss says why,
--- in the order a user runs into it: no row, no directory, no hook set.
-local function review_row()
-    local target = M.current_target()
-    local ctx
-    if target and target.kind == 'row' and state.data then
-        ctx = state.data:context(target.block_id)
-    end
-    if not ctx then
-        return notify('put the cursor on an Agent block')
-    end
-    if not ctx.path then
-        return notify('this Block has no directory to review')
-    end
-    state.hooks:review(review_ctx(ctx))
 end
 
 -- Every normal-mode key of the Dashboard. Later Work Items add their keys
@@ -407,7 +346,9 @@ local function keymaps(buf)
         nowait = true,
         desc = 'Close the Dashboard',
     })
-    vim.keymap.set('n', '<CR>', focus_target, {
+    vim.keymap.set('n', '<CR>', function()
+        state.actions:focus()
+    end, {
         buffer = buf,
         nowait = true,
         desc = 'Go to the Agent block or Session',
@@ -422,7 +363,9 @@ local function keymaps(buf)
         nowait = true,
         desc = 'Toggle the Exited rows',
     })
-    vim.keymap.set('n', 'd', review_row, {
+    vim.keymap.set('n', 'd', function()
+        state.actions:review()
+    end, {
         buffer = buf,
         nowait = true,
         desc = 'Review the Agent block',
@@ -435,6 +378,10 @@ end
 local function cleanup(group)
     stop_polling()
     state.poller = nil
+    if state.actions then
+        state.actions:dispose()
+        state.actions = nil
+    end
     if state.git then
         state.git:stop()
         state.git = nil
@@ -443,7 +390,6 @@ local function cleanup(group)
     state.lines, state.highlights, state.targets = nil, nil, {}
     state.data, state.show_exited = nil, nil
     state.hooks = nil
-    state.backend = nil
     state.previous_buf = nil
     state.focused = true
     state.saved = {}
@@ -540,8 +486,13 @@ local function ensure_poller(opts)
     if state.poller then
         state.poller.stop()
     end
+    -- The actions of the old Backend belong to a Dashboard lifetime that ends
+    -- here: a result it still waits for must not reach this one.
+    if state.actions then
+        state.actions:dispose()
+        state.actions = nil
+    end
 
-    state.backend = backend
     state.poller = poll.new({
         backend = backend,
         interval_ms = config.get().refresh_ms,
@@ -577,6 +528,16 @@ local function ensure_poller(opts)
         hooks = state.hooks,
         git = state.git,
         memory = MEMORY,
+    })
+
+    -- `<CR>` and `d`: one object per Dashboard, so a late result of an older
+    -- one is dropped by its `dispose`.
+    state.actions = actions.new({
+        backend = backend,
+        data = state.data,
+        hooks = state.hooks,
+        refresh = refresh_now,
+        current_target = M.current_target,
     })
     return state.poller
 end
