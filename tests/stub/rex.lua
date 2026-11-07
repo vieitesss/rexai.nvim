@@ -8,6 +8,9 @@
 -- DIR holds `state.json` (see `tests/rex_stub.lua`) and receives `calls.jsonl`,
 -- one line per call with its argument list.
 
+local root = vim.fn.fnamemodify(debug.getinfo(1, 'S').source:sub(2), ':p:h:h:h')
+package.path = root .. '/lua/?.lua;' .. package.path
+
 local dir = arg[1]
 local argv = {}
 for i = 2, #arg do
@@ -58,6 +61,11 @@ if state.stdout then
     os.exit(0)
 end
 
+local backend = require('rexai.backend.fake').new({
+    snapshots = { state.snapshot },
+    peek = state.peek,
+})
+
 -- The value that follows `flag` in the argument list.
 local function option(flag)
     for i = 1, #argv - 1 do
@@ -65,29 +73,6 @@ local function option(flag)
             return argv[i + 1]
         end
     end
-end
-
-local function exists(target)
-    for _, session in ipairs(state.snapshot.sessions) do
-        if session.id == target.session_id then
-            if not target.window_id then
-                return true
-            end
-            for _, window in ipairs(session.windows) do
-                if window.id == target.window_id then
-                    if not target.block_id then
-                        return true
-                    end
-                    for _, block in ipairs(window.blocks) do
-                        if block.id == target.block_id then
-                            return true
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return false
 end
 
 -- A new number each call, kept across calls in a file.
@@ -109,16 +94,20 @@ if command == 'do' then
         out(state.snapshot)
     elseif script == 'focus.lua' then
         local target = vim.json.decode(option('--args'))
-        if not exists(target) then
-            die(1, 'target not found')
-        end
-        out({ client_id = 'client:stub' })
+        backend.focus(target, function(err)
+            if err then
+                die(1, 'target not found')
+            end
+            out({ client_id = 'client:stub' })
+        end)
     end
     die(2, 'stub: unknown script ' .. tostring(script))
 elseif command == 'window' and argv[2] == 'new' then
-    if not exists({ session_id = option('-s') }) then
-        die(3, 'session target not found')
-    end
+    backend.focus({ session_id = option('-s') }, function(err)
+        if err then
+            die(3, 'session target not found')
+        end
+    end)
     local n = next_number()
     out({
         window_id = 'window:stub-' .. n,
@@ -139,19 +128,13 @@ elseif command == 'new' then
     })
 elseif command == 'capture' then
     local target = { session_id = option('-s'), block_id = option('-b') }
-    for _, session in ipairs(state.snapshot.sessions) do
-        for _, window in ipairs(session.windows) do
-            if session.id == target.session_id then
-                target.window_id = window.id
-                if exists(target) then
-                    io.stdout:write((state.peek or {})[target.block_id] or '')
-                    io.stdout:write('\n')
-                    os.exit(0)
-                end
-            end
+    backend.peek(target, function(err, text)
+        if err then
+            die(3, 'block target not found')
         end
-    end
-    die(3, 'block target not found')
+        io.stdout:write(text, '\n')
+        os.exit(0)
+    end)
 end
 
 die(2, 'stub: unsupported command ' .. tostring(command))

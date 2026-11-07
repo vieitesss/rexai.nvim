@@ -14,11 +14,11 @@ local M = {}
 local function has_target(snapshot, target)
     for _, session in ipairs(snapshot.sessions or {}) do
         if session.id == target.session_id then
-            if not target.window_id then
+            if not target.window_id and not target.block_id then
                 return true
             end
             for _, window in ipairs(session.windows or {}) do
-                if window.id == target.window_id then
+                if not target.window_id or window.id == target.window_id then
                     if not target.block_id then
                         return true
                     end

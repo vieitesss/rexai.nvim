@@ -118,6 +118,33 @@ function M.run(name, make)
                 assert.is_nil(got[1])
             end)
 
+            it(
+                'finds a Block in any Window when no Window is targeted',
+                function()
+                    local snapshot = snap.single({
+                        id = 'block:b1',
+                        app = 'pi',
+                        state = 'idle',
+                    })
+                    table.insert(
+                        snapshot.sessions[1].windows,
+                        1,
+                        snap.window({
+                            id = 'window:w2',
+                            blocks = {},
+                        })
+                    )
+                    local backend = setup(snapshot)
+                    local got = result(function(callback)
+                        backend.focus({
+                            session_id = 'session:s1',
+                            block_id = 'block:b1',
+                        }, callback)
+                    end)
+                    assert.is_nil(got[1])
+                end
+            )
+
             it('accepts a Session or a Window alone', function()
                 local backend = setup()
                 local by_session = result(function(callback)
@@ -139,6 +166,17 @@ function M.run(name, make)
                     backend.focus({
                         session_id = 'session:s1',
                         window_id = 'window:w1',
+                        block_id = 'block:gone',
+                    }, callback)
+                end)
+                assert.is_string(got[1])
+            end)
+
+            it('fails for a missing Block without a Window target', function()
+                local backend = setup()
+                local got = result(function(callback)
+                    backend.focus({
+                        session_id = 'session:s1',
                         block_id = 'block:gone',
                     }, callback)
                 end)
@@ -207,6 +245,47 @@ function M.run(name, make)
                 end)
                 assert.is_nil(got[1])
                 assert.are.equal('first line\nlast line', got[2])
+            end)
+
+            it(
+                'returns screen text from any Window when no Window is targeted',
+                function()
+                    local snapshot = snap.single({
+                        id = 'block:b1',
+                        app = 'pi',
+                        state = 'idle',
+                    })
+                    table.insert(
+                        snapshot.sessions[1].windows,
+                        1,
+                        snap.window({
+                            id = 'window:w2',
+                            blocks = {},
+                        })
+                    )
+                    local backend =
+                        setup(snapshot, { ['block:b1'] = 'agent output' })
+                    local got = result(function(callback)
+                        backend.peek({
+                            session_id = 'session:s1',
+                            block_id = 'block:b1',
+                        }, callback)
+                    end)
+                    assert.is_nil(got[1])
+                    assert.are.equal('agent output', got[2])
+                end
+            )
+
+            it('fails for a missing Block without a Window target', function()
+                local backend = setup()
+                local got = result(function(callback)
+                    backend.peek({
+                        session_id = 'session:s1',
+                        block_id = 'block:gone',
+                    }, callback)
+                end)
+                assert.is_string(got[1])
+                assert.is_nil(got[2])
             end)
 
             it('returns empty text for a blank screen', function()
