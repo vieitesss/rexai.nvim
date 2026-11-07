@@ -96,7 +96,9 @@ local function window_rows(session, window, agents, memory, present)
         end
     end
 
-    label.assign(window.label, live)
+    -- Exited rows take part in the labels, so a new Agent block in the same
+    -- Window never ends up with the label of one that exited.
+    label.assign(window.label, rows)
     for _, row in ipairs(live) do
         memory.blocks[row.block_id] = copy(row)
     end

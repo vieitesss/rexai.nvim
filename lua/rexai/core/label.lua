@@ -12,7 +12,8 @@ function M.default_id(window_label)
     return (window_label or ''):match('^Window (%x+)$')
 end
 
--- Sets `label` on every row of one Window. Each row needs a `harness`.
+-- Sets `label` on every row of one Window, live or exited. Each row needs a
+-- `harness`.
 --
 -- - A custom Window label is used as it is, and gets the harness appended
 --   when the Window holds two or more Agent blocks.

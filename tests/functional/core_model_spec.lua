@@ -257,8 +257,8 @@ describe('core.model', function()
         end)
 
         describe('exited', function()
-            local function with(block)
-                return snap.single(block, 'work')
+            local function with(block, window_label)
+                return snap.single(block, window_label or 'work')
             end
 
             it('shows a remembered agent that stopped being one', function()
@@ -343,6 +343,87 @@ describe('core.model', function()
                     agents
                 )
                 assert.are.same({}, sessions)
+            end)
+
+            describe('with a new agent in the same Window', function()
+                local function two_blocks(window_label, first, second)
+                    return snap.snapshot({
+                        snap.session({
+                            id = 'session:s1',
+                            windows = {
+                                snap.window({
+                                    id = 'window:w1',
+                                    label = window_label,
+                                    blocks = {
+                                        snap.block(first),
+                                        snap.block(second),
+                                    },
+                                }),
+                            },
+                        }),
+                    })
+                end
+
+                it('never gives two rows the same label', function()
+                    local memory = model.new_memory()
+                    model.build(
+                        with(
+                            { id = 'block:b1', app = 'pi', state = 'idle' },
+                            'Window 01a1b2c3'
+                        ),
+                        agents,
+                        memory
+                    )
+                    local sessions = model.build(
+                        two_blocks(
+                            'Window 01a1b2c3',
+                            { id = 'block:b1', argv0 = '/bin/zsh' },
+                            { id = 'block:b2', app = 'pi', state = 'working' }
+                        ),
+                        agents,
+                        memory
+                    )
+
+                    local exited = find(sessions, 'block:b1')
+                    local live = find(sessions, 'block:b2')
+                    assert.are.equal('exited', exited.status)
+                    assert.are.equal('pi b2c3', exited.label)
+                    assert.are.equal('pi b2c3 #2', live.label)
+                end)
+
+                it('keeps the harness on a custom label', function()
+                    local memory = model.new_memory()
+                    model.build(
+                        with(
+                            { id = 'block:b1', app = 'pi', state = 'idle' },
+                            'auth'
+                        ),
+                        agents,
+                        memory
+                    )
+                    local sessions = model.build(
+                        two_blocks(
+                            'auth',
+                            { id = 'block:b1', argv0 = '/bin/zsh' },
+                            {
+                                id = 'block:b2',
+                                app = 'claude-code',
+                                state = 'idle',
+                            }
+                        ),
+                        agents,
+                        memory
+                    )
+
+                    assert.are.equal(
+                        'auth pi',
+                        find(sessions, 'block:b1').label
+                    )
+                    assert.are.equal(
+                        'auth claude-code',
+                        find(sessions, 'block:b2').label
+                    )
+                end)
             end)
 
             it('forgets a block Rex no longer lists', function()
