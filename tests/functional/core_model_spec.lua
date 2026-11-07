@@ -289,6 +289,65 @@ describe('core.model', function()
                 assert.are.equal('exited', sessions[1].status)
             end)
 
+            it('targets the Window that holds the Block now', function()
+                local memory = model.new_memory()
+                model.build(
+                    with({
+                        id = 'block:b1',
+                        app = 'pi',
+                        state = 'blocked',
+                        kind = 'question',
+                        msg = 'which one?',
+                        cwd = '/work/app',
+                        title = 'parser',
+                    }),
+                    agents,
+                    memory
+                )
+                local moved = with({
+                    id = 'block:b1',
+                    argv0 = '/bin/zsh',
+                    cwd = '/work/shell',
+                    title = 'shell',
+                }, 'other')
+                moved.sessions[1].windows[1].id = 'window:w2'
+                moved.sessions[1].active_window_id = 'window:w2'
+
+                local sessions = model.build(moved, agents, memory)
+                assert.are.same({
+                    session_id = 'session:s1',
+                    window_id = 'window:w2',
+                    block_id = 'block:b1',
+                    harness = 'pi',
+                    label = 'other',
+                    status = 'exited',
+                    last_status = 'needs_input',
+                    kind = 'question',
+                    msg = 'which one?',
+                    cwd = '/work/app',
+                    title = 'parser',
+                    updated_at = '2026-01-01T10:00:00+00:00',
+                }, sessions[1].rows[1])
+            end)
+
+            it('targets the Session that holds the Block now', function()
+                local memory = model.new_memory()
+                model.build(
+                    with({ id = 'block:b1', app = 'pi', state = 'working' }),
+                    agents,
+                    memory
+                )
+                local moved = with({ id = 'block:b1', argv0 = '/bin/zsh' })
+                moved.sessions[1].id = 'session:s2'
+
+                local sessions = model.build(moved, agents, memory)
+                local row = sessions[1].rows[1]
+                assert.are.equal('exited', row.status)
+                assert.are.equal('working', row.last_status)
+                assert.are.equal('session:s2', row.session_id)
+                assert.are.equal('window:w1', row.window_id)
+            end)
+
             it('carries the exit code when Rex reports one', function()
                 local memory = model.new_memory()
                 model.build(
@@ -390,6 +449,55 @@ describe('core.model', function()
                     assert.are.equal('pi b2c3', exited.label)
                     assert.are.equal('pi b2c3 #2', live.label)
                 end)
+
+                it(
+                    'keeps labels distinct from a user-added numbered app',
+                    function()
+                        local custom_agents = {
+                            apps = { 'pi', 'pi #2' },
+                            commands = {},
+                        }
+                        local memory = model.new_memory()
+                        model.build(
+                            two_blocks(
+                                'work',
+                                { id = 'block:b1', app = 'pi', state = 'idle' },
+                                {
+                                    id = 'block:b2',
+                                    app = 'pi',
+                                    state = 'working',
+                                }
+                            ),
+                            custom_agents,
+                            memory
+                        )
+                        local snapshot = two_blocks(
+                            'work',
+                            { id = 'block:b1', argv0 = '/bin/zsh' },
+                            { id = 'block:b2', argv0 = '/bin/zsh' }
+                        )
+                        table.insert(
+                            snapshot.sessions[1].windows[1].blocks,
+                            snap.block({
+                                id = 'block:b3',
+                                app = 'pi #2',
+                                state = 'working',
+                            })
+                        )
+
+                        local sessions =
+                            model.build(snapshot, custom_agents, memory)
+                        local first = find(sessions, 'block:b1')
+                        local second = find(sessions, 'block:b2')
+                        local live = find(sessions, 'block:b3')
+                        assert.are.equal('exited', first.status)
+                        assert.are.equal('exited', second.status)
+                        assert.are.equal('working', live.status)
+                        assert.are_not.equal(first.label, second.label)
+                        assert.are_not.equal(first.label, live.label)
+                        assert.are_not.equal(second.label, live.label)
+                    end
+                )
 
                 it('keeps the harness on a custom label', function()
                     local memory = model.new_memory()

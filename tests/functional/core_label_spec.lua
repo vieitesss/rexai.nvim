@@ -87,6 +87,23 @@ describe('core.label', function()
                 expected = { 'pi 2c3d', 'pi 2c3d #2', 'pi 2c3d #3' },
             },
             {
+                name = 'a user-added app cannot reuse a numbered label',
+                window = 'work',
+                rows = rows('pi', 'pi', 'pi #2'),
+                expected = { 'work pi', 'work pi #2', 'work pi #2 #2' },
+            },
+            {
+                name = 'numbered labels skip app labels already in use',
+                window = 'work',
+                rows = rows('pi #2', 'pi #3', 'pi', 'pi'),
+                expected = {
+                    'work pi #2',
+                    'work pi #3',
+                    'work pi',
+                    'work pi #4',
+                },
+            },
+            {
                 name = 'no rows changes nothing',
                 window = 'work',
                 rows = {},

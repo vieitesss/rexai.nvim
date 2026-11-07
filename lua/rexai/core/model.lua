@@ -71,8 +71,10 @@ local function live_row(session, window, block, harness)
     }
 end
 
-local function exited_row(remembered, block)
+local function exited_row(session, window, remembered, block)
     local row = copy(remembered)
+    row.session_id = session.id
+    row.window_id = window.id
     local last_exit = block.process and block.process.last_exit
     row.last_status = remembered.status
     row.status = 'exited'
@@ -92,7 +94,8 @@ local function window_rows(session, window, agents, memory, present)
             live[#live + 1] = row
             rows[#rows + 1] = row
         elseif memory.blocks[block.id] then
-            rows[#rows + 1] = exited_row(memory.blocks[block.id], block)
+            rows[#rows + 1] =
+                exited_row(session, window, memory.blocks[block.id], block)
         end
     end
 

@@ -38,10 +38,12 @@ function M.assign(window_label, rows)
             label = window_label
         end
 
-        seen[label] = (seen[label] or 0) + 1
-        if seen[label] > 1 then
-            label = label .. ' #' .. seen[label]
+        local base, number = label, 2
+        while seen[label] do
+            label = base .. ' #' .. number
+            number = number + 1
         end
+        seen[label] = true
         row.label = label
     end
 end
