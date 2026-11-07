@@ -4,15 +4,11 @@
 -- git runner, git clock and timer are seams.
 
 local config = require('rexai.config')
-local dashboard = require('rexai.ui.dashboard')
-local fake = require('rexai.backend.fake')
 local model = require('rexai.core.model')
 local render = require('rexai.ui.render')
 local snap = require('tests.snapshots')
+local support = require('tests.ui_support')
 
-local NAME = 'rexai://dashboard'
--- 2026-11-07T16:15:00Z, so the ages never move.
-local NOW = 1794068100
 -- Not the Session this Neovim runs in, so no Home header shows up by itself.
 local HOME = 'session:home'
 -- The status git prints for a clean branch.
@@ -22,126 +18,10 @@ local CLEAN = table.concat({
     '# branch.upstream origin/main',
     '# branch.ab +0 -0',
 }, '\n')
+-- What `git rev-parse --show-toplevel` prints for the row in a work tree.
+local ROOT = '/work/orbit\n'
 -- Where the hook sends the row of `block:b1`, a directory of its own.
 local HOOKED = '/work/vendored'
-
--- A timer the test fires by hand.
-local function fake_timer()
-    local timer = { pending = {} }
-
-    function timer.after(ms, callback)
-        local entry = { ms = ms, callback = callback }
-        table.insert(timer.pending, entry)
-        return function()
-            for index, pending in ipairs(timer.pending) do
-                if pending == entry then
-                    table.remove(timer.pending, index)
-                    return
-                end
-            end
-        end
-    end
-
-    function timer.fire()
-        local entry = table.remove(timer.pending, 1)
-        assert.is_not_nil(entry, 'nothing is scheduled')
-        entry.callback()
-    end
-
-    return timer
-end
-
--- The git runner seam: the test answers every call, in order.
-local function runner()
-    local r = { queue = {}, calls = {} }
-
-    function r.run(argv, callback)
-        r.queue[#r.queue + 1] = { argv = argv, callback = callback }
-        r.calls[#r.calls + 1] = argv
-    end
-
-    ---@return table the oldest call the test has not answered
-    function r.next()
-        local call = table.remove(r.queue, 1)
-        assert.is_not_nil(call, 'no git call is waiting')
-        return call
-    end
-
-    -- Answers the status call, then the work tree root call.
-    ---@param status string|nil
-    ---@param root string|nil
-    function r.answer(status, root)
-        r.next().callback(nil, status or CLEAN)
-        r.next().callback(nil, root or '/work/orbit\n')
-    end
-
-    ---@return string[] the paths git was pointed at with `-C`
-    function r.paths()
-        local out = {}
-        for _, argv in ipairs(r.calls) do
-            if argv[2] == '-C' then
-                out[#out + 1] = argv[3]
-            elseif argv[3] == '-C' then
-                out[#out + 1] = argv[4]
-            end
-        end
-        return out
-    end
-
-    return r
-end
-
----@return table a clock the test moves by hand, in milliseconds
-local function fake_clock()
-    local clock = { ms = 1000 }
-    function clock.now()
-        return clock.ms
-    end
-    function clock.advance(ms)
-        clock.ms = clock.ms + ms
-    end
-    return clock
-end
-
----@param calls table[]
----@return integer how many snapshots the Dashboard asked for
-local function snapshot_calls(calls)
-    local total = 0
-    for _, call in ipairs(calls) do
-        if call.method == 'snapshot' then
-            total = total + 1
-        end
-    end
-    return total
-end
-
----@return table a notifier that records what it was told
-local function notifier()
-    local out = { calls = {} }
-
-    function out.notify(message, level)
-        out.calls[#out.calls + 1] = { message = message, level = level }
-    end
-
-    return out
-end
-
--- Lets every callback `vim.schedule` queued run.
-local function flush()
-    local done = false
-    vim.schedule(function()
-        done = true
-    end)
-    assert.is_true(vim.wait(500, function()
-        return done
-    end, 1))
-end
-
--- Types `keys` in normal mode and waits for the Dashboard to handle them.
----@param keys string
-local function press(keys)
-    vim.api.nvim_feedkeys(vim.keycode(keys), 'x', false)
-end
 
 -- One Agent block in a work tree, and one that has no directory at all.
 local SNAPSHOT = snap.snapshot({
@@ -174,97 +54,53 @@ local SNAPSHOT = snap.snapshot({
     }),
 })
 
----@return integer|nil
-local function dashboard_buf()
-    local buf = vim.fn.bufnr(NAME)
-    if buf == -1 then
-        return nil
-    end
-    return buf
-end
-
----@return string[]
-local function dashboard_lines()
-    return vim.api.nvim_buf_get_lines(dashboard_buf(), 0, -1, false)
-end
-
----@param targets table<integer, rexai.RenderTarget>
----@param block_id string
----@return integer
-local function line_of(targets, block_id)
-    for line, target in pairs(targets) do
-        if target.block_id == block_id then
-            return line
-        end
-    end
-    error('no line for ' .. block_id)
-end
-
 ---@param snapshot table
 ---@return table<integer, rexai.RenderTarget>
 local function targets_of(snapshot)
     return render.build(
         model.build(snapshot, config.get().agents),
-        { now = NOW, home_session_id = HOME }
+        { now = support.NOW, home_session_id = HOME }
     ).targets
 end
 
 describe('ui.dashboard hooks', function()
-    local timer, scratch, r, clock, told, real_notify
+    local h
 
     before_each(function()
-        config.setup()
-        scratch = vim.api.nvim_create_buf(true, false)
-        vim.api.nvim_win_set_buf(0, scratch)
-        timer, r, clock, told = fake_timer(), runner(), fake_clock(), notifier()
-        -- The `d` key reports through `vim.notify`; the hooks object gets the
-        -- same recorder as its test seam.
-        real_notify = vim.notify
-        vim.notify = told.notify
-        vim.env.REX_SESSION = nil
+        h = support.new()
     end)
 
     after_each(function()
-        vim.notify = real_notify
-        local buf = dashboard_buf()
-        if buf then
-            if vim.api.nvim_buf_is_valid(scratch) then
-                for _, win in ipairs(vim.fn.win_findbuf(buf)) do
-                    if vim.api.nvim_win_is_valid(win) then
-                        vim.api.nvim_win_set_buf(win, scratch)
-                    end
-                end
-            end
-            pcall(vim.api.nvim_buf_delete, buf, { force = true })
-        end
-        if vim.api.nvim_buf_is_valid(scratch) then
-            vim.api.nvim_buf_delete(scratch, { force = true })
-        end
-        config.setup()
+        h:close()
     end)
+
+    ---@return string[] the paths git was pointed at with `-C`
+    local function paths()
+        local out = {}
+        for _, argv in ipairs(h.git.calls) do
+            if argv[2] == '-C' then
+                out[#out + 1] = argv[3]
+            elseif argv[3] == '-C' then
+                out[#out + 1] = argv[4]
+            end
+        end
+        return out
+    end
 
     ---@param snapshot table
     ---@return table the Backend
     ---@return table[] every Backend call, in order
     local function open_with(snapshot)
-        local backend, calls = fake.new({ snapshots = { snapshot } })
-        dashboard.open({
-            backend = backend,
-            after = timer.after,
-            now = function()
-                return NOW
-            end,
+        return h:open({
+            snapshots = { snapshot },
             home_session_id = HOME,
-            git = { run = r.run, clock = clock.now },
-            hooks = { notify = told.notify },
         })
-        return backend, calls
     end
 
     ---@param block_id string
     local function put_cursor_on(snapshot, block_id)
         vim.api.nvim_win_set_cursor(vim.api.nvim_get_current_win(), {
-            line_of(targets_of(snapshot), block_id),
+            support.line_of(targets_of(snapshot), block_id),
             0,
         })
     end
@@ -280,15 +116,15 @@ describe('ui.dashboard hooks', function()
             })
             open_with(SNAPSHOT)
 
-            assert.are.same({ HOOKED }, r.paths())
-            r.answer()
-            flush()
+            assert.are.same({ HOOKED }, paths())
+            h.git.answer(CLEAN, ROOT)
+            support.flush()
 
             -- The work tree root is asked about the same path.
-            assert.are.same({ HOOKED, HOOKED }, r.paths())
+            assert.are.same({ HOOKED, HOOKED }, paths())
             -- The row without a hook result and without a directory is not
             -- asked about at all.
-            assert.are.equal(2, #r.calls)
+            assert.are.equal(2, #h.git.calls)
         end)
 
         it('runs once per row and snapshot, and not again on e', function()
@@ -326,30 +162,23 @@ describe('ui.dashboard hooks', function()
                     },
                 }),
             })
-            local backend = fake.new({ snapshots = { SNAPSHOT, gone } })
-            dashboard.open({
-                backend = backend,
-                after = timer.after,
-                now = function()
-                    return NOW
-                end,
+            h:open({
+                snapshots = { SNAPSHOT, gone },
                 home_session_id = HOME,
-                git = { run = r.run, clock = clock.now },
-                hooks = { notify = told.notify },
             })
             assert.are.same({ 'block:b1', 'block:b2' }, seen)
 
-            press('e')
+            h:press('e')
             assert.are.same({ 'block:b1', 'block:b2' }, seen)
 
-            timer.fire()
+            h.timer.fire()
             assert.are.same(
                 { 'block:b1', 'block:b2', 'block:b1', 'block:b2' },
                 seen
             )
 
             -- The Exited row is hidden now, and the hook still does not run.
-            press('e')
+            h:press('e')
             assert.are.equal(4, #seen)
         end)
 
@@ -360,16 +189,16 @@ describe('ui.dashboard hooks', function()
                 end,
             })
             open_with(SNAPSHOT)
-            timer.fire()
-            timer.fire()
-            flush()
+            h.timer.fire()
+            h.timer.fire()
+            support.flush()
 
-            assert.are.equal(1, #told.calls)
-            assert.are.equal(vim.log.levels.WARN, told.calls[1].level)
+            assert.are.equal(1, #h.notify.calls)
+            assert.are.equal(vim.log.levels.WARN, h.notify.calls[1].level)
             assert.is_truthy(
-                told.calls[1].message:find('rexai: resolve_path', 1, true)
+                h.notify.calls[1].message:find('rexai: resolve_path', 1, true)
             )
-            assert.are.equal('/work/orbit', r.paths()[1])
+            assert.are.equal('/work/orbit', paths()[1])
         end)
     end)
 
@@ -419,11 +248,11 @@ describe('ui.dashboard hooks', function()
                 end,
             })
             open_with(ONE)
-            r.answer()
-            flush()
+            h.git.answer(CLEAN, ROOT)
+            support.flush()
             put_cursor_on(ONE, 'block:b1')
 
-            press('d')
+            h:press('d')
 
             assert.are.equal(1, #got)
             assert.are.same({
@@ -434,7 +263,7 @@ describe('ui.dashboard hooks', function()
                 window = { id = 'window:w1' },
                 block = ROW,
             }, got[1])
-            assert.are.same({}, told.calls)
+            assert.are.same({}, h.notify.calls)
         end)
 
         it(
@@ -452,7 +281,7 @@ describe('ui.dashboard hooks', function()
                 open_with(ONE)
                 put_cursor_on(ONE, 'block:b1')
 
-                press('d')
+                h:press('d')
 
                 assert.are.equal(HOOKED, got.path)
                 assert.is_nil(got.repo_root)
@@ -473,14 +302,14 @@ describe('ui.dashboard hooks', function()
                 0,
             })
 
-            press('d')
+            h:press('d')
 
             assert.are.equal(0, calls)
-            assert.are.equal(1, #told.calls)
-            assert.are.equal(vim.log.levels.INFO, told.calls[1].level)
+            assert.are.equal(1, #h.notify.calls)
+            assert.are.equal(vim.log.levels.INFO, h.notify.calls[1].level)
             assert.are.equal(
                 'rexai: put the cursor on an Agent block',
-                told.calls[1].message
+                h.notify.calls[1].message
             )
         end)
 
@@ -514,14 +343,14 @@ describe('ui.dashboard hooks', function()
             open_with(bare)
             put_cursor_on(bare, 'block:b1')
 
-            press('d')
+            h:press('d')
 
             assert.are.equal(0, calls)
-            assert.are.equal(1, #told.calls)
-            assert.are.equal(vim.log.levels.INFO, told.calls[1].level)
+            assert.are.equal(1, #h.notify.calls)
+            assert.are.equal(vim.log.levels.INFO, h.notify.calls[1].level)
             assert.are.equal(
                 'rexai: this Block has no directory to review',
-                told.calls[1].message
+                h.notify.calls[1].message
             )
         end)
 
@@ -529,14 +358,14 @@ describe('ui.dashboard hooks', function()
             open_with(ONE)
             put_cursor_on(ONE, 'block:b1')
 
-            press('d')
+            h:press('d')
 
-            assert.are.equal(1, #told.calls)
-            assert.are.equal(vim.log.levels.INFO, told.calls[1].level)
+            assert.are.equal(1, #h.notify.calls)
+            assert.are.equal(vim.log.levels.INFO, h.notify.calls[1].level)
             assert.are.equal(
                 'rexai: no review function is set; add review = '
                     .. 'function(ctx) ... end to setup()',
-                told.calls[1].message
+                h.notify.calls[1].message
             )
         end)
 
@@ -549,25 +378,25 @@ describe('ui.dashboard hooks', function()
                     end,
                 })
                 local _, calls = open_with(ONE)
-                assert.are.equal(1, snapshot_calls(calls))
+                assert.are.equal(1, support.count(calls, 'snapshot'))
                 put_cursor_on(ONE, 'block:b1')
 
-                press('d')
+                h:press('d')
 
-                assert.are.equal(1, #told.calls)
-                assert.are.equal(vim.log.levels.WARN, told.calls[1].level)
+                assert.are.equal(1, #h.notify.calls)
+                assert.are.equal(vim.log.levels.WARN, h.notify.calls[1].level)
                 assert.are.equal(
                     'rexai: review failed: boom',
-                    told.calls[1].message
+                    h.notify.calls[1].message
                 )
                 -- The Session header, the row, and the Home session header.
-                assert.are.equal(4, #dashboard_lines())
+                assert.are.equal(4, #h:lines())
 
                 -- `r` still asks Rex, so the Dashboard is not stuck.
-                press('r')
-                timer.fire()
-                flush()
-                assert.are.equal(3, snapshot_calls(calls))
+                h:press('r')
+                h.timer.fire()
+                support.flush()
+                assert.are.equal(3, support.count(calls, 'snapshot'))
             end
         )
     end)

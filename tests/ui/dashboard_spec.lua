@@ -8,43 +8,11 @@ local fake = require('rexai.backend.fake')
 local model = require('rexai.core.model')
 local render = require('rexai.ui.render')
 local snap = require('tests.snapshots')
+local support = require('tests.ui_support')
 
 local AGENTS = config.defaults.agents
-local NAME = 'rexai://dashboard'
--- 2026-11-07T16:15:00Z, so the ages never move.
-local NOW = 1794068100
 -- Not the Session this Neovim runs in, so no Home header shows up by itself.
 local HOME = 'session:home'
-
--- A timer that records what the poller schedules, so a test fires it.
-local function fake_timer()
-    local timer = { pending = {} }
-
-    function timer.after(ms, callback)
-        local entry = { ms = ms, callback = callback }
-        table.insert(timer.pending, entry)
-        return function()
-            for index, pending in ipairs(timer.pending) do
-                if pending == entry then
-                    table.remove(timer.pending, index)
-                    return
-                end
-            end
-        end
-    end
-
-    function timer.fire()
-        local entry = table.remove(timer.pending, 1)
-        assert.is_not_nil(entry, 'nothing is scheduled')
-        entry.callback()
-    end
-
-    function timer.count()
-        return #timer.pending
-    end
-
-    return timer
-end
 
 ---@param id string
 ---@param spec table
@@ -121,20 +89,8 @@ local SECOND = snapshot_of('session:s1', {
 ---@return rexai.Render
 local function expected(snapshot, opts)
     opts = opts or {}
-    opts.now = NOW
+    opts.now = support.NOW
     return render.build(model.build(snapshot, AGENTS), opts)
-end
-
----@param out rexai.Render
----@param block_id string
----@return integer the line of that Agent block
-local function line_of(out, block_id)
-    for line, target in pairs(out.targets) do
-        if target.block_id == block_id then
-            return line
-        end
-    end
-    error('no line for ' .. block_id)
 end
 
 ---@param win integer
@@ -144,82 +100,25 @@ local function window_option(win, option)
     return vim.api.nvim_get_option_value(option, { win = win })
 end
 
----@return integer|nil
-local function dashboard_buf()
-    local buf = vim.fn.bufnr(NAME)
-    if buf == -1 then
-        return nil
-    end
-    return buf
-end
-
--- Types `keys` in normal mode and waits for the Dashboard to handle them.
----@param keys string
-local function press(keys)
-    vim.api.nvim_feedkeys(
-        vim.api.nvim_replace_termcodes(keys, true, false, true),
-        'x',
-        false
-    )
-end
-
----@return string[]
-local function dashboard_lines()
-    return vim.api.nvim_buf_get_lines(dashboard_buf(), 0, -1, false)
-end
-
 describe('ui.dashboard', function()
-    local timer
-    local scratch
+    local h
 
     before_each(function()
-        scratch = vim.api.nvim_create_buf(true, false)
-        timer = fake_timer()
-        vim.env.REX_SESSION = nil
-        vim.g.loaded_rexai = nil
-        vim.cmd('runtime plugin/rexai.lua')
+        h = support.new()
     end)
 
     after_each(function()
-        local buf = dashboard_buf()
-        if buf then
-            local replacement = scratch
-            if not vim.api.nvim_buf_is_valid(replacement) then
-                replacement = vim.api.nvim_create_buf(true, false)
-                scratch = replacement
-            end
-            for _, win in ipairs(vim.fn.win_findbuf(buf)) do
-                if vim.api.nvim_win_is_valid(win) then
-                    vim.api.nvim_win_set_buf(win, replacement)
-                end
-            end
-            pcall(vim.api.nvim_buf_delete, buf, { force = true })
-        end
-        if vim.api.nvim_buf_is_valid(scratch) then
-            vim.api.nvim_buf_delete(scratch, { force = true })
-        end
-        package.loaded['rexai.backend.rex'] = nil
+        h:close()
     end)
-
-    ---@param backend rexai.Backend
-    local function stub_rex(backend)
-        package.loaded['rexai.backend.rex'] = {
-            new = function()
-                return backend
-            end,
-        }
-    end
 
     describe('the Rexai command', function()
         it('shows the Dashboard in the current window', function()
-            local backend, calls = fake.new({ snapshots = { UNTIMED } })
-            stub_rex(backend)
             local win = vim.api.nvim_get_current_win()
 
-            vim.cmd('Rexai')
+            local _, calls = h:command({ snapshots = { UNTIMED } })
 
             assert.are.equal(win, vim.api.nvim_get_current_win())
-            local buf = assert(dashboard_buf())
+            local buf = assert(h:buf())
             assert.are.equal(buf, vim.api.nvim_win_get_buf(win))
 
             assert.are.equal('nofile', vim.bo[buf].buftype)
@@ -236,8 +135,8 @@ describe('ui.dashboard', function()
             assert.is_false(window_option(win, 'spell'))
             assert.is_false(window_option(win, 'foldenable'))
 
-            local want = expected(UNTIMED, { home_session_id = nil })
-            assert.are.same(want.lines, dashboard_lines())
+            local want = expected(UNTIMED)
+            assert.are.same(want.lines, h:lines())
 
             -- One highlight span per span of the render, on the buffer.
             local marks = vim.api.nvim_buf_get_extmarks(
@@ -252,17 +151,14 @@ describe('ui.dashboard', function()
         end)
 
         it('reuses the same buffer for a second :Rexai', function()
-            local backend = fake.new({ snapshots = { UNTIMED } })
-            stub_rex(backend)
+            h:command({ snapshots = { UNTIMED } })
+            local first = h:buf()
+            h:command()
 
-            vim.cmd('Rexai')
-            local first = dashboard_buf()
-            vim.cmd('Rexai')
-
-            assert.are.equal(first, dashboard_buf())
+            assert.are.equal(first, h:buf())
             local named = {}
             for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-                if vim.api.nvim_buf_get_name(buf) == NAME then
+                if vim.api.nvim_buf_get_name(buf) == dashboard.NAME then
                     named[#named + 1] = buf
                 end
             end
@@ -270,58 +166,43 @@ describe('ui.dashboard', function()
         end)
 
         it('leaves no timer behind when opened twice', function()
-            local backend = fake.new({ snapshots = { UNTIMED } })
-            stub_rex(backend)
-
-            dashboard.open({ backend = backend, after = timer.after })
-            dashboard.open({ backend = backend, after = timer.after })
+            h:open({ snapshots = { UNTIMED } })
+            h:open({ snapshots = { UNTIMED } })
 
             -- The second open ticked once and replaced the pending timer, so
             -- only one is left, not two.
-            assert.are.equal(1, timer.count())
+            assert.are.equal(1, h.timer.count())
         end)
     end)
 
     describe('leaving the Dashboard', function()
         it('returns to the buffer that was in the window', function()
-            local backend = fake.new({ snapshots = { UNTIMED } })
-            stub_rex(backend)
-            vim.api.nvim_win_set_buf(0, scratch)
+            h:command({ snapshots = { UNTIMED } })
+            assert.are.equal(dashboard.NAME, vim.api.nvim_buf_get_name(0))
 
-            vim.cmd('Rexai')
-            assert.are.equal('rexai://dashboard', vim.api.nvim_buf_get_name(0))
+            h:press('q')
 
-            press('q')
-
-            assert.are.equal(scratch, vim.api.nvim_get_current_buf())
+            assert.are.equal(h.scratch, vim.api.nvim_get_current_buf())
             assert.are.equal(1, #vim.api.nvim_tabpage_list_wins(0))
         end)
 
         it('closes the window when there is no buffer to return to', function()
-            local backend = fake.new({ snapshots = { UNTIMED } })
-            stub_rex(backend)
-            vim.api.nvim_win_set_buf(0, scratch)
-
-            vim.cmd('Rexai')
+            h:command({ snapshots = { UNTIMED } })
             vim.cmd('vsplit')
             assert.are.equal(2, #vim.api.nvim_tabpage_list_wins(0))
-            vim.api.nvim_buf_delete(scratch, { force = true })
+            vim.api.nvim_buf_delete(h.scratch, { force = true })
 
-            press('q')
+            h:press('q')
 
             assert.are.equal(1, #vim.api.nvim_tabpage_list_wins(0))
-            assert.are.equal('rexai://dashboard', vim.api.nvim_buf_get_name(0))
+            assert.are.equal(dashboard.NAME, vim.api.nvim_buf_get_name(0))
         end)
 
         it('starts an empty buffer in a window with nothing else', function()
-            local backend = fake.new({ snapshots = { UNTIMED } })
-            stub_rex(backend)
-            vim.api.nvim_win_set_buf(0, scratch)
+            h:command({ snapshots = { UNTIMED } })
+            vim.api.nvim_buf_delete(h.scratch, { force = true })
 
-            vim.cmd('Rexai')
-            vim.api.nvim_buf_delete(scratch, { force = true })
-
-            press('q')
+            h:press('q')
 
             assert.are.equal(1, #vim.api.nvim_tabpage_list_wins(0))
             assert.are.equal('', vim.api.nvim_buf_get_name(0))
@@ -329,127 +210,97 @@ describe('ui.dashboard', function()
     end)
 
     describe('polling', function()
-        ---@return integer how many snapshots the Backend served
-        local function served(calls)
-            local count = 0
-            for _, call in ipairs(calls) do
-                if call.method == 'snapshot' then
-                    count = count + 1
-                end
-            end
-            return count
-        end
-
         it('asks Rex at once and then after the refresh interval', function()
-            local backend, calls = fake.new({ snapshots = { UNTIMED } })
-            vim.api.nvim_win_set_buf(0, scratch)
+            local _, calls = h:open({ snapshots = { UNTIMED } })
 
-            dashboard.open({ backend = backend, after = timer.after })
+            assert.are.equal(1, support.count(calls, 'snapshot'))
+            assert.are.equal(1, h.timer.count())
+            assert.are.equal(config.get().refresh_ms, h.timer.pending[1].ms)
 
-            assert.are.equal(1, served(calls))
-            assert.are.equal(1, timer.count())
-            assert.are.equal(config.get().refresh_ms, timer.pending[1].ms)
-
-            timer.fire()
-            assert.are.equal(2, served(calls))
-            assert.are.equal(1, timer.count())
+            h.timer.fire()
+            assert.are.equal(2, support.count(calls, 'snapshot'))
+            assert.are.equal(1, h.timer.count())
         end)
 
         it(
             'stops when no window shows the buffer and starts again on :Rexai',
             function()
-                local backend, calls = fake.new({ snapshots = { UNTIMED } })
-                vim.api.nvim_win_set_buf(0, scratch)
-                dashboard.open({ backend = backend, after = timer.after })
+                local _, calls = h:open({ snapshots = { UNTIMED } })
 
-                press('q')
-                assert.are.equal(0, timer.count())
-                assert.are.equal(1, served(calls))
+                h:press('q')
+                assert.are.equal(0, h.timer.count())
+                assert.are.equal(1, support.count(calls, 'snapshot'))
 
-                vim.cmd('Rexai')
-                assert.are.equal(2, served(calls))
-                assert.are.equal(1, timer.count())
+                h:command()
+                assert.are.equal(2, support.count(calls, 'snapshot'))
+                assert.are.equal(1, h.timer.count())
             end
         )
 
         it('stops on FocusLost and refreshes on FocusGained', function()
-            local backend, calls = fake.new({ snapshots = { UNTIMED } })
-            vim.api.nvim_win_set_buf(0, scratch)
-            dashboard.open({ backend = backend, after = timer.after })
+            local _, calls = h:open({ snapshots = { UNTIMED } })
 
             vim.api.nvim_exec_autocmds('FocusLost', {})
-            assert.are.equal(0, timer.count())
+            assert.are.equal(0, h.timer.count())
 
             vim.api.nvim_exec_autocmds('FocusGained', {})
-            assert.are.equal(2, served(calls))
-            assert.are.equal(1, timer.count())
+            assert.are.equal(2, support.count(calls, 'snapshot'))
+            assert.are.equal(1, h.timer.count())
         end)
 
         it('keeps polling while another window shows the buffer', function()
-            local backend, calls = fake.new({ snapshots = { UNTIMED } })
-            vim.api.nvim_win_set_buf(0, scratch)
-            dashboard.open({ backend = backend, after = timer.after })
+            local _, calls = h:open({ snapshots = { UNTIMED } })
             vim.cmd('vsplit')
             assert.are.equal(2, #vim.api.nvim_tabpage_list_wins(0))
 
-            press('q')
+            h:press('q')
 
             assert.are.equal(2, #vim.api.nvim_tabpage_list_wins(0))
-            assert.are.equal(1, timer.count())
-            timer.fire()
-            assert.is_true(served(calls) > 1)
+            assert.are.equal(1, h.timer.count())
+            h.timer.fire()
+            assert.is_true(support.count(calls, 'snapshot') > 1)
         end)
 
         it('starts when a window shows the buffer again', function()
-            local backend, calls = fake.new({ snapshots = { UNTIMED } })
-            vim.api.nvim_win_set_buf(0, scratch)
-            dashboard.open({ backend = backend, after = timer.after })
-            press('q')
-            assert.are.equal(0, timer.count())
-            local served_before = served(calls)
+            local _, calls = h:open({ snapshots = { UNTIMED } })
+            h:press('q')
+            assert.are.equal(0, h.timer.count())
+            local served_before = support.count(calls, 'snapshot')
 
-            vim.api.nvim_win_set_buf(0, dashboard_buf())
+            vim.api.nvim_win_set_buf(0, h:buf())
 
-            assert.are.equal(served_before + 1, served(calls))
-            assert.are.equal(1, timer.count())
+            assert.are.equal(
+                served_before + 1,
+                support.count(calls, 'snapshot')
+            )
+            assert.are.equal(1, h.timer.count())
         end)
 
         it('does not write the buffer when nothing changed', function()
-            local backend = fake.new({ snapshots = { FIRST } })
-            vim.api.nvim_win_set_buf(0, scratch)
-            dashboard.open({
-                backend = backend,
-                after = timer.after,
-                now = function()
-                    return NOW
-                end,
-                home_session_id = HOME,
-            })
+            h:open({ snapshots = { FIRST }, home_session_id = HOME })
             local changes = 0
-            vim.api.nvim_buf_attach(dashboard_buf(), false, {
+            vim.api.nvim_buf_attach(h:buf(), false, {
                 on_lines = function()
                     changes = changes + 1
                 end,
             })
-            local before = dashboard_lines()
+            local before = h:lines()
 
-            timer.fire()
-            timer.fire()
+            h.timer.fire()
+            h.timer.fire()
 
             assert.are.equal(0, changes)
-            assert.are.same(before, dashboard_lines())
+            assert.are.same(before, h:lines())
         end)
 
         it('makes no Rex call while the buffer is hidden', function()
-            local backend, calls = fake.new({ snapshots = { UNTIMED } })
-            vim.api.nvim_win_set_buf(0, scratch)
-            dashboard.open({ backend = backend, after = timer.after })
-            press('q')
+            local _, calls = h:open({ snapshots = { UNTIMED } })
+            h:press('q')
 
             vim.api.nvim_exec_autocmds('FocusGained', {})
 
-            assert.are.equal(1, served(calls))
-            assert.are.equal(0, timer.count())
+            assert.are.equal(1, support.count(calls, 'snapshot'))
+            assert.are.equal(0, h.timer.count())
         end)
     end)
 
@@ -473,19 +324,10 @@ describe('ui.dashboard', function()
                     },
                 }),
             })
-            local backend = fake.new({ snapshots = { raw } })
-            vim.api.nvim_win_set_buf(0, scratch)
 
-            dashboard.open({
-                backend = backend,
-                after = timer.after,
-                now = function()
-                    return NOW
-                end,
-                home_session_id = HOME,
-            })
+            h:open({ snapshots = { raw }, home_session_id = HOME })
 
-            assert.are.same({ '  landing (home)' }, dashboard_lines())
+            assert.are.same({ '  landing (home)' }, h:lines())
         end)
     end)
 
@@ -493,53 +335,32 @@ describe('ui.dashboard', function()
         it('shows the error in the buffer and clears it on recovery', function()
             local backend = fake.new({ snapshots = { UNTIMED } })
             backend.fail_next('snapshot', 'rex timed out')
-            vim.api.nvim_win_set_buf(0, scratch)
-            local notified = 0
-            local notify = vim.notify
-            vim.notify = function()
-                notified = notified + 1
-            end
 
-            local ok, err = pcall(function()
-                dashboard.open({
-                    backend = backend,
-                    after = timer.after,
-                    now = function()
-                        return NOW
-                    end,
-                    home_session_id = HOME,
-                })
+            h:open({ backend = backend, home_session_id = HOME })
 
-                assert.is_truthy(
-                    dashboard_lines()[1]:find('Rex unreadable', 1, true)
-                )
-                -- The poller retries, so the Dashboard recovers by itself.
-                assert.are.equal(1, timer.count())
-                timer.fire()
-                assert.are.same(
-                    expected(UNTIMED, { home_session_id = HOME }).lines,
-                    dashboard_lines()
-                )
-                assert.are.equal(0, notified)
-            end)
-            vim.notify = notify
-            assert(ok, err)
+            assert.is_truthy(h:lines()[1]:find('Rex unreadable', 1, true))
+            -- The poller retries, so the Dashboard recovers by itself.
+            assert.are.equal(1, h.timer.count())
+            h.timer.fire()
+            assert.are.same(
+                expected(UNTIMED, { home_session_id = HOME }).lines,
+                h:lines()
+            )
+            assert.are.equal(0, #h.notify.calls)
         end)
     end)
 
     describe('window options', function()
         it('gives them back when the window leaves the Dashboard', function()
-            local backend = fake.new({ snapshots = { UNTIMED } })
-            vim.api.nvim_win_set_buf(0, scratch)
             local win = vim.api.nvim_get_current_win()
             vim.api.nvim_set_option_value('number', true, { win = win })
             vim.api.nvim_set_option_value('signcolumn', 'yes', { win = win })
 
-            dashboard.open({ backend = backend, after = timer.after })
+            h:open({ snapshots = { UNTIMED } })
             assert.is_false(window_option(win, 'number'))
             assert.are.equal('no', window_option(win, 'signcolumn'))
 
-            press('q')
+            h:press('q')
 
             assert.is_true(window_option(win, 'number'))
             assert.are.equal('yes', window_option(win, 'signcolumn'))
@@ -548,19 +369,17 @@ describe('ui.dashboard', function()
 
     describe('closing', function()
         it('leaves no buffer, autocmd or timer behind', function()
-            local backend = fake.new({ snapshots = { UNTIMED } })
-            vim.api.nvim_win_set_buf(0, scratch)
             local windows = #vim.api.nvim_tabpage_list_wins(0)
             local buffers = #vim.api.nvim_list_bufs()
 
-            dashboard.open({ backend = backend, after = timer.after })
-            local buf = dashboard_buf()
-            press('q')
-            assert.are.equal(0, timer.count())
+            h:open({ snapshots = { UNTIMED } })
+            local buf = assert(h:buf())
+            h:press('q')
+            assert.are.equal(0, h.timer.count())
             vim.api.nvim_buf_delete(buf, { force = true })
 
             assert.is_false(vim.api.nvim_buf_is_valid(buf))
-            assert.are.equal(-1, vim.fn.bufnr(NAME))
+            assert.are.equal(-1, vim.fn.bufnr(dashboard.NAME))
             assert.are.equal(0, vim.fn.exists('#RexaiDashboard'))
             assert.are.equal(windows, #vim.api.nvim_tabpage_list_wins(0))
             assert.are.equal(buffers, #vim.api.nvim_list_bufs())
@@ -571,43 +390,37 @@ describe('ui.dashboard', function()
         it(
             'keeps each window on its own Agent block when the rows move',
             function()
-                local backend = fake.new({ snapshots = { FIRST, SECOND } })
-                local options = {
-                    backend = backend,
-                    after = timer.after,
-                    now = function()
-                        return NOW
-                    end,
+                h:open({
+                    snapshots = { FIRST, SECOND },
                     home_session_id = HOME,
-                }
-                vim.api.nvim_win_set_buf(0, scratch)
-                dashboard.open(options)
+                })
                 local first_win = vim.api.nvim_get_current_win()
 
                 vim.cmd('vsplit')
                 local second_win = vim.api.nvim_get_current_win()
                 local before = expected(FIRST, { home_session_id = HOME })
                 vim.api.nvim_win_set_cursor(first_win, {
-                    line_of(before, 'block:b1'),
+                    support.line_of(before.targets, 'block:b1'),
                     0,
                 })
                 vim.api.nvim_win_set_cursor(second_win, {
-                    line_of(before, 'block:b2'),
+                    support.line_of(before.targets, 'block:b2'),
                     0,
                 })
 
-                timer.fire()
+                h.timer.fire()
 
                 local after = expected(SECOND, { home_session_id = HOME })
                 assert.is_true(
-                    line_of(after, 'block:b1') ~= line_of(before, 'block:b1')
+                    support.line_of(after.targets, 'block:b1')
+                        ~= support.line_of(before.targets, 'block:b1')
                 )
                 assert.are.equal(
-                    line_of(after, 'block:b1'),
+                    support.line_of(after.targets, 'block:b1'),
                     vim.api.nvim_win_get_cursor(first_win)[1]
                 )
                 assert.are.equal(
-                    line_of(after, 'block:b2'),
+                    support.line_of(after.targets, 'block:b2'),
                     vim.api.nvim_win_get_cursor(second_win)[1]
                 )
                 assert.are.equal(
@@ -633,27 +446,18 @@ describe('ui.dashboard', function()
                     },
                 },
             })
-            local backend = fake.new({ snapshots = { FIRST, only } })
-            local options = {
-                backend = backend,
-                after = timer.after,
-                now = function()
-                    return NOW
-                end,
-            }
-            vim.api.nvim_win_set_buf(0, scratch)
-            dashboard.open(options)
+            h:open({ snapshots = { FIRST, only } })
             local win = vim.api.nvim_get_current_win()
             local before = expected(FIRST)
             vim.api.nvim_win_set_cursor(win, {
-                line_of(before, 'block:b1'),
+                support.line_of(before.targets, 'block:b1'),
                 0,
             })
-            assert.are.equal(3, #dashboard_lines())
+            assert.are.equal(3, #h:lines())
 
-            timer.fire()
+            h.timer.fire()
 
-            assert.are.equal(2, #dashboard_lines())
+            assert.are.equal(2, #h:lines())
             assert.are.equal(2, vim.api.nvim_win_get_cursor(win)[1])
         end)
     end)
