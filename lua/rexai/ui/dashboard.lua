@@ -34,6 +34,10 @@ local state = {
     lines = nil,
     highlights = nil,
     targets = {},
+    sessions = nil,
+    home_label = nil,
+    show_exited = nil,
+    backend = nil,
     poller = nil,
     previous_buf = nil,
     focused = true,
@@ -95,17 +99,6 @@ local function quit()
     end
 
     vim.cmd('enew')
-end
-
--- Every normal-mode key of the Dashboard. Later Work Items add their keys
--- here.
----@param buf integer
-local function keymaps(buf)
-    vim.keymap.set('n', 'q', quit, {
-        buffer = buf,
-        nowait = true,
-        desc = 'Close the Dashboard',
-    })
 end
 
 -- Takes the window options over, remembering what each window had.
@@ -245,22 +238,26 @@ local function label_of_home(snapshot)
     end
 end
 
-local function on_snapshot(snapshot)
+-- Draws what the model last gave, so `e` re-renders without asking Rex.
+local function draw()
+    if not state.sessions then
+        return
+    end
     local options = config.get()
-    local sessions = model.build(snapshot, options.agents, MEMORY)
-    show(render.build(sessions, {
+    show(render.build(state.sessions, {
         now = (state.now or os.time)(),
-        show_exited = options.show_exited,
+        show_exited = state.show_exited,
         title_width = options.title_width,
         home_session_id = state.home_session_id,
-        home_label = label_of_home(snapshot),
+        home_label = state.home_label,
     }))
 end
 
--- The Dashboard polls only while a window shows it and Neovim has focus.
----@return boolean
-local function should_poll()
-    return state.focused and #windows() > 0
+local function on_snapshot(snapshot)
+    local options = config.get()
+    state.sessions = model.build(snapshot, options.agents, MEMORY)
+    state.home_label = label_of_home(snapshot)
+    draw()
 end
 
 local function stop_polling()
@@ -269,9 +266,10 @@ local function stop_polling()
     end
 end
 
--- Asks Rex at once and makes sure the poller is running.
-local function refresh_now()
-    if not state.poller or not should_poll() then
+-- Asks Rex at once, whatever the focus flag says, as long as a window shows
+-- the buffer.
+local function ask_rex()
+    if not state.poller or #windows() == 0 then
         return
     end
     if state.poller.running() then
@@ -279,6 +277,71 @@ local function refresh_now()
     else
         state.poller.start()
     end
+end
+
+-- Asks Rex at once and makes sure the poller is running. The Dashboard
+-- polls only while a window shows it and Neovim has focus.
+local function refresh_now()
+    if state.focused and #windows() > 0 then
+        ask_rex()
+    end
+end
+
+-- `<CR>`: goes to the Agent block under the cursor, or to the Session of a
+-- header. Rex changes the view itself, so only a failure needs an answer:
+-- the target has probably vanished, and the Dashboard asks Rex again.
+local function focus_target()
+    local target = M.current_target()
+    if not target or not state.backend then
+        return
+    end
+
+    local request = { session_id = target.session_id }
+    if target.kind == 'row' then
+        request.window_id = target.window_id
+        request.block_id = target.block_id
+    end
+
+    state.backend.focus(request, function(err)
+        if not err then
+            return
+        end
+        vim.notify('rexai: ' .. err, vim.log.levels.WARN)
+        refresh_now()
+    end)
+end
+
+-- `e`: shows or hides the Exited rows. The buffer is the feedback, and the
+-- toggle is Dashboard state, not config.
+local function toggle_exited()
+    state.show_exited = not state.show_exited
+    draw()
+end
+
+-- Every normal-mode key of the Dashboard. Later Work Items add their keys
+-- here.
+---@param buf integer
+local function keymaps(buf)
+    vim.keymap.set('n', 'q', quit, {
+        buffer = buf,
+        nowait = true,
+        desc = 'Close the Dashboard',
+    })
+    vim.keymap.set('n', '<CR>', focus_target, {
+        buffer = buf,
+        nowait = true,
+        desc = 'Go to the Agent block or Session',
+    })
+    vim.keymap.set('n', 'r', ask_rex, {
+        buffer = buf,
+        nowait = true,
+        desc = 'Refresh the Dashboard',
+    })
+    vim.keymap.set('n', 'e', toggle_exited, {
+        buffer = buf,
+        nowait = true,
+        desc = 'Toggle the Exited rows',
+    })
 end
 
 -- Forgets everything about the Dashboard once its buffer is wiped, so no
@@ -289,6 +352,8 @@ local function cleanup(group)
     state.poller = nil
     state.buf = nil
     state.lines, state.highlights, state.targets = nil, nil, {}
+    state.sessions, state.home_label, state.show_exited = nil, nil, nil
+    state.backend = nil
     state.previous_buf = nil
     state.focused = true
     state.saved = {}
@@ -361,6 +426,9 @@ end
 -- the next snapshot draws over the error.
 ---@param err string
 local function on_error(err)
+    -- The rows of the last snapshot are stale, so `e` leaves the error alone
+    -- until a snapshot succeeds.
+    state.sessions, state.home_label = nil, nil
     show(render.build({}, { error = err, now = (state.now or os.time)() }))
 end
 
@@ -383,6 +451,7 @@ local function ensure_poller(opts)
         state.poller.stop()
     end
 
+    state.backend = backend
     state.poller = poll.new({
         backend = backend,
         interval_ms = config.get().refresh_ms,
@@ -405,6 +474,9 @@ function M.open(opts)
     highlights.define()
     state.now = opts.now
     state.home_session_id = opts.home_session_id or vim.env.REX_SESSION
+    if state.show_exited == nil then
+        state.show_exited = config.get().show_exited
+    end
 
     local buf = ensure_buffer()
     keymaps(buf)
