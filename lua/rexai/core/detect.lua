@@ -21,6 +21,7 @@ end
 ---@class rexai.Agents
 ---@field apps string[] `app` strings from program status records
 ---@field commands string[] foreground command names (basename of argv0)
+---@field launch table<string, string[]>|nil full argv by agent command name
 
 -- A Block is an Agent block when a status record names an app in
 -- `agents.apps`, or its foreground command is in `agents.commands`. The app

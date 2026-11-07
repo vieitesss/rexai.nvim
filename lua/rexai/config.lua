@@ -24,6 +24,8 @@ local M = {}
 ---@field title_width integer widest title, in display cells, `…` included
 ---@field rex_bin string the `rex` executable the Backend runs
 ---@field peek_lines integer lines `peek` keeps from the end of a Block
+---@field focus_new boolean select the Window or Session a create made
+---@field session_name (fun(path: string): string|nil)|nil names a new Session
 ---@field glyphs rexai.Glyphs the glyph of every Agent status
 ---@field agents rexai.Agents what makes a Block an Agent block
 ---@field resolve_path (fun(block: rexai.Row): string|nil)|nil the directory of a row
@@ -37,6 +39,13 @@ M.defaults = {
     title_width = 40,
     rex_bin = 'rex',
     peek_lines = 20,
+    -- `n` and `N` make the new Window the current one; false leaves the view
+    -- alone.
+    focus_new = true,
+    -- `session_name = function(path) return 'a label' end` names a new
+    -- Session. Without it, the two last directories of the path name it.
+    -- A hook that throws falls back to that rule and warns once.
+    session_name = nil,
     glyphs = {
         needs_input = '!',
         error = 'x',

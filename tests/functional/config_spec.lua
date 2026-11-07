@@ -29,6 +29,15 @@ describe('config', function()
         it('takes the agent detection lists from the core', function()
             assert.are.same(core_defaults.agents, config.defaults.agents)
         end)
+
+        it('has no agents.launch entry by default', function()
+            assert.are.same({}, config.defaults.agents.launch)
+        end)
+
+        it('selects a new Window and names a new Session', function()
+            assert.is_true(config.defaults.focus_new)
+            assert.is_nil(config.defaults.session_name)
+        end)
     end)
 
     describe('get', function()
@@ -71,6 +80,35 @@ describe('config', function()
                 config.defaults.glyphs.needs_input,
                 config.get().glyphs.needs_input
             )
+        end)
+
+        it('keeps an agents.launch entry and the other defaults', function()
+            config.setup({
+                agents = {
+                    launch = { claude = { 'claude', '--continue' } },
+                },
+            })
+            assert.are.same(
+                { claude = { 'claude', '--continue' } },
+                config.get().agents.launch
+            )
+            assert.are.same(
+                config.defaults.agents.apps,
+                config.get().agents.apps
+            )
+            assert.are.same(
+                config.defaults.agents.commands,
+                config.get().agents.commands
+            )
+        end)
+
+        it('keeps the new Session options', function()
+            local hook = function()
+                return 'feature-42'
+            end
+            config.setup({ focus_new = false, session_name = hook })
+            assert.is_false(config.get().focus_new)
+            assert.are.equal(hook, config.get().session_name)
         end)
 
         it('does not change the defaults', function()
