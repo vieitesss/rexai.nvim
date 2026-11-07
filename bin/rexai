@@ -1,0 +1,91 @@
+#!/bin/sh
+# Put the user in the rexai Dashboard from any shell, inside Rex or outside it.
+#
+# It finds or creates the Session labelled `rexai` (--name changes that) and its
+# Window labelled `dashboard` through scripts/home.lua, then hands the ids that
+# script printed to scripts/focus.lua, which selects them in the calling Rex app
+# and focuses the Block. Neither script is copied here: this file only decides
+# what to ask for.
+#
+# `rex` runs with an argument list and every expansion is quoted: the path of
+# this checkout may contain a space. Nothing is built as a shell string.
+
+set -u
+
+usage() {
+    cat <<'USAGE'
+usage: rexai [--name NAME]
+
+Puts you in the rexai Dashboard, creating its Session and Window when missing.
+  --name NAME  label of the Session; defaults to rexai
+  -h, --help   print this usage
+USAGE
+}
+
+name=rexai
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        --name)
+            if [ "$#" -lt 2 ]; then
+                usage >&2
+                exit 2
+            fi
+            name=$2
+            shift
+            ;;
+        --name=*)
+            name=${1#--name=}
+            ;;
+        *)
+            usage >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+
+# Rex picks a label of its own when given an empty one, so an empty name could
+# never be found again.
+if [ -z "$name" ]; then
+    usage >&2
+    exit 2
+fi
+
+if ! command -v rex >/dev/null 2>&1; then
+    echo 'rexai: rex is not on PATH' >&2
+    exit 127
+fi
+
+# The directory of this checkout, found by resolving this file through its
+# symlinks one hop at a time: older macOS `readlink` has no -f.
+self=$0
+hops=0
+while [ -L "$self" ] && [ "$hops" -lt 40 ]; do
+    link=$(readlink "$self") || break
+    case $link in
+        /*) self=$link ;;
+        *) self=$(dirname "$self")/$link ;;
+    esac
+    hops=$((hops + 1))
+done
+unset CDPATH
+root=$(cd -P "$(dirname "$self")/.." && pwd) || exit 1
+
+# `home.lua` reads its arguments as KEY=VALUE pairs, so user text never has to
+# be quoted into JSON.
+if [ -n "${HOME-}" ]; then
+    result=$(rex do "$root/scripts/home.lua" "name=$name" "cwd=$HOME" --json)
+else
+    result=$(rex do "$root/scripts/home.lua" "name=$name" --json)
+fi
+status=$?
+if [ "$status" -ne 0 ]; then
+    exit "$status"
+fi
+
+printf '%s\n' "$result" | rex do "$root/scripts/focus.lua" --args - --json
+exit $?
