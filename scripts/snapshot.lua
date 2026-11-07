@@ -75,10 +75,11 @@ end
 
 local function session(s)
     local out = { id = s.session_id, label = s.label, windows = {} }
-    local attached, attach_err =
+    -- `rex.call` returns `nil, message` on failure instead of raising.
+    local ok, attached, attach_err =
         pcall(rex.call, 'session.attach', { session_id = s.session_id })
-    if not attached then
-        out.error = tostring(attach_err)
+    if not ok or attached == nil then
+        out.error = tostring(ok and attach_err or attached)
         return out
     end
     local view, view_err = rex.session.view({ session_id = s.session_id })
