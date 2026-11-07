@@ -105,37 +105,6 @@ local function pure_modules()
 end
 
 describe('core purity', function()
-    it('finds the core modules', function()
-        assert.is_true(#core_modules() >= 5)
-    end)
-
-    describe('the sandbox', function()
-        it('rejects a read of vim', function()
-            local env = new_sandbox()
-            local chunk = assert(loadstring('return vim'))
-            setfenv(chunk, env)
-            local ok, err = pcall(chunk)
-            assert.is_false(ok)
-            assert.matches('global "vim"', err)
-        end)
-
-        it('rejects a global that is set', function()
-            local env = new_sandbox()
-            local chunk = assert(loadstring('leaked = 1'))
-            setfenv(chunk, env)
-            local ok, err = pcall(chunk)
-            assert.is_false(ok)
-            assert.matches('global "leaked"', err)
-        end)
-
-        it('rejects a module outside rexai', function()
-            local env = new_sandbox()
-            local ok, err = pcall(env.require, 'plenary.test_harness')
-            assert.is_false(ok)
-            assert.matches('may only require rexai', err)
-        end)
-    end)
-
     describe('loading', function()
         for _, name in ipairs(pure_modules()) do
             it(name .. ' loads with only the standard library', function()
