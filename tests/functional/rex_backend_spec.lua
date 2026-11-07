@@ -295,6 +295,49 @@ describe('backend.rex', function()
             assert.are.same({}, stub.calls())
         end)
 
+        it('carries --keep-open once when the spec asks for it', function()
+            local backend = rex.new({ bin = stub.bin })
+            result(function(callback)
+                backend.create_window({
+                    session_id = 'session:s1',
+                    cwd = '/work tree',
+                    keep_open = true,
+                    command = { 'pi' },
+                }, callback)
+            end)
+
+            local argv = stub.calls()[1]
+            local seen = 0
+            for _, word in ipairs(argv) do
+                if word == '--keep-open' then
+                    seen = seen + 1
+                end
+            end
+            assert.are.equal(1, seen)
+            assert.are.same({
+                '--autostart=false',
+                'window',
+                'new',
+                '-s',
+                'session:s1',
+                '-c',
+                '/work tree',
+                '--keep-open',
+                '--json',
+                '--',
+                'pi',
+            }, argv)
+        end)
+
+        it('leaves --keep-open out when the spec is silent', function()
+            local backend = rex.new({ bin = stub.bin })
+            result(function(callback)
+                backend.create_window({ session_id = 'session:s1' }, callback)
+            end)
+
+            assert.is_false(vim.tbl_contains(stub.calls()[1], '--keep-open'))
+        end)
+
         it('fails for a Session that is gone', function()
             local backend = rex.new({ bin = stub.bin })
             local got = result(function(callback)
@@ -341,6 +384,44 @@ describe('backend.rex', function()
                 { '--autostart=false', 'new', '--json' },
                 stub.calls()[1]
             )
+        end)
+
+        it('carries --keep-open once when the spec asks for it', function()
+            local backend = rex.new({ bin = stub.bin })
+            result(function(callback)
+                backend.create_session({
+                    name = 'work',
+                    cwd = '/work tree',
+                    keep_open = true,
+                }, callback)
+            end)
+
+            local argv = stub.calls()[1]
+            local seen = 0
+            for _, word in ipairs(argv) do
+                if word == '--keep-open' then
+                    seen = seen + 1
+                end
+            end
+            assert.are.equal(1, seen)
+            assert.are.same({
+                '--autostart=false',
+                'new',
+                'work',
+                '-c',
+                '/work tree',
+                '--keep-open',
+                '--json',
+            }, argv)
+        end)
+
+        it('leaves --keep-open out when the spec is silent', function()
+            local backend = rex.new({ bin = stub.bin })
+            result(function(callback)
+                backend.create_session({ name = 'work' }, callback)
+            end)
+
+            assert.is_false(vim.tbl_contains(stub.calls()[1], '--keep-open'))
         end)
     end)
 

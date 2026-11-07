@@ -162,7 +162,8 @@ function M.new(opts)
     end
 
     -- spec: `session_id`, and optionally `name`, `cwd`, `command` (a list of
-    -- words) and `focus` (false keeps the current focus).
+    -- words), `keep_open` (the Window stays after its command exits) and
+    -- `focus` (false keeps the current focus).
     function backend.create_window(spec, callback)
         if not spec.session_id then
             return callback('session_id is required')
@@ -176,6 +177,9 @@ function M.new(opts)
         end
         if spec.focus == false then
             args[#args + 1] = '--focus=false'
+        end
+        if spec.keep_open then
+            args[#args + 1] = '--keep-open'
         end
         args[#args + 1] = '--json'
 
@@ -191,8 +195,9 @@ function M.new(opts)
         end, callback)
     end
 
-    -- spec: optionally `name`, `cwd`, `window` (the label of the first Window)
-    -- and `command` (a list of words).
+    -- spec: optionally `name`, `cwd`, `window` (the label of the first Window),
+    -- `command` (a list of words) and `keep_open` (the Window stays after its
+    -- command exits).
     function backend.create_session(spec, callback)
         local args = { 'new' }
         if spec.name then
@@ -203,6 +208,9 @@ function M.new(opts)
         end
         if spec.window then
             vim.list_extend(args, { '--window', spec.window })
+        end
+        if spec.keep_open then
+            args[#args + 1] = '--keep-open'
         end
         args[#args + 1] = '--json'
 

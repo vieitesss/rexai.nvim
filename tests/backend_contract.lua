@@ -234,6 +234,29 @@ function M.run(name, make)
                 assert.is_string(window[1])
                 assert.is_string(session[1])
             end)
+
+            it('accept a keep_open Window and Session', function()
+                local backend = setup()
+                local window = result(function(callback)
+                    backend.create_window(
+                        { session_id = 'session:s1', keep_open = true },
+                        callback
+                    )
+                end)
+                local session = result(function(callback)
+                    backend.create_session(
+                        { name = 'new', keep_open = true },
+                        callback
+                    )
+                end)
+
+                assert.is_nil(window[1])
+                assert.is_nil(session[1])
+                assert.is_string(window[2].window_id)
+                assert.are.equal('session:s1', window[2].session_id)
+                assert.is_string(session[2].session_id)
+                assert.is_string(session[2].window_id)
+            end)
         end)
 
         describe('peek', function()
