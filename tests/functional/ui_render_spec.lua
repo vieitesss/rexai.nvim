@@ -217,6 +217,32 @@ describe('ui.render', function()
             assert.is_nil(find(out, highlights.group('idle')))
         end)
 
+        it(
+            'names a Home session the model lacks with the label given',
+            function()
+                local out = build({}, {
+                    home_session_id = 'session:home',
+                    home_label = 'landing',
+                })
+                assert.are.same({ '  landing (home)' }, out.lines)
+                assert.is_truthy(find(out, 'RexaiHeader', 'landing'))
+            end
+        )
+
+        it(
+            'keeps the id of a Home session that has a label in the model',
+            function()
+                local sessions = {
+                    session({ id = 'session:home', label = 'orbit' }),
+                }
+                local out = build(sessions, {
+                    home_session_id = 'session:home',
+                    home_label = 'landing',
+                })
+                assert.are.same({ '  orbit (home)' }, out.lines)
+            end
+        )
+
         it('marks the Home session when the model has it', function()
             local sessions = {
                 session({

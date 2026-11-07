@@ -35,6 +35,7 @@ M.ELLIPSIS = '…'
 ---@field show_exited boolean|nil list rows whose agent has ended
 ---@field title_width integer|nil widest title, in display cells
 ---@field home_session_id string|nil the Session that holds this Neovim
+---@field home_label string|nil what Rex calls the Home session
 ---@field git table<string, string>|nil slot text by Block id
 ---@field error string|nil why Rex could not be read
 
@@ -67,6 +68,7 @@ local function resolve(opts)
         show_exited = pick(opts.show_exited, defaults.show_exited),
         title_width = pick(opts.title_width, defaults.title_width),
         home_session_id = opts.home_session_id,
+        home_label = opts.home_label,
         git = opts.git or {},
         error = opts.error,
     }
@@ -221,11 +223,11 @@ local function listed(sessions, opts)
     end
 
     -- The model drops a Session with no Agent blocks, so the Home session is
-    -- often missing. Its id is all that is known about it then.
+    -- often missing. Rex's name for it, or its id, is all that is known then.
     if opts.home_session_id and not home_seen then
         out[#out + 1] = {
             id = opts.home_session_id,
-            label = opts.home_session_id,
+            label = opts.home_label or opts.home_session_id,
             status = nil,
             error = nil,
             rows = {},

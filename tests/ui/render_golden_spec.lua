@@ -263,6 +263,33 @@ CASES[#CASES + 1] = {
     end,
 }
 
+CASES[#CASES + 1] = {
+    name = 'home-labelled',
+    run = function()
+        return build_model({
+            session({
+                id = 'session:orbit',
+                label = 'orbit',
+                window_label = 'api',
+                blocks = {
+                    snap.block({
+                        id = 'block:b1',
+                        app = 'pi',
+                        state = 'done',
+                        title = 'the release',
+                        updated_at = '2026-11-07T16:15:00Z',
+                    }),
+                },
+            }),
+        }),
+            {
+                now = NOW,
+                home_session_id = 'session:home',
+                home_label = 'landing',
+            }
+    end,
+}
+
 -- A git slot, whose column is dropped when no row has one.
 CASES[#CASES + 1] = {
     name = 'git',
