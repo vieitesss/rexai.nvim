@@ -5,7 +5,9 @@
 -- `dispose` makes every pending continuation a no-op, so a result never acts
 -- on a Dashboard that did not issue the request.
 
+local config = require('rexai.config')
 local core_git = require('rexai.core.git')
+local core_launch = require('rexai.core.launch')
 local core_peek = require('rexai.core.peek')
 local float = require('rexai.ui.peek')
 
@@ -22,6 +24,8 @@ local M = {}
 ---@field focus fun(self: rexai.Actions) goes to the Agent block or Session
 ---@field review fun(self: rexai.Actions) reviews the Agent block of the row
 ---@field peek fun(self: rexai.Actions) shows the float of the Agent block
+---@field new_window fun(self: rexai.Actions) adds an Agent Window to a Session
+---@field new_session fun(self: rexai.Actions) starts a Session with an Agent Window
 ---@field dispose fun(self: rexai.Actions) drops every pending continuation
 
 ---@param opts rexai.ActionsOpts
@@ -41,6 +45,12 @@ function M.new(opts)
     -- one.
     local peeked = nil
     local peeks = 0
+
+    -- How many `n` and `N` presses there were: only the newest press creates,
+    -- so a second press while the first prompt is open never creates twice.
+    local adds = 0
+    -- A broken `session_name` hook is worth one warning per Dashboard.
+    local named = false
 
     local object = {}
 
@@ -193,6 +203,226 @@ function M.new(opts)
                 peeked = block_id
             end)
         )
+    end
+
+    -- The directory an answer names: `~` expanded, absolute, without a
+    -- trailing slash. An empty answer names none.
+    ---@param answer string
+    ---@return string|nil
+    local function directory(answer)
+        if vim.trim(answer) == '' then
+            return nil
+        end
+        return vim.fs.normalize(vim.fn.fnamemodify(answer, ':p'))
+    end
+
+    ---@param path string
+    ---@return boolean
+    local function is_directory(path)
+        local stat = vim.uv.fs_stat(path)
+        return stat ~= nil and stat.type == 'directory'
+    end
+
+    -- The label of a new Session in `path`: what the `session_name` hook says,
+    -- or the two last directories. A broken hook warns once per Dashboard and
+    -- falls back to that rule.
+    ---@param path string
+    ---@return string
+    local function session_label(path)
+        local hook = config.get().session_name
+        local custom
+        if type(hook) == 'function' then
+            local ok, value = pcall(hook, path)
+            if ok then
+                custom = value
+            elseif not named then
+                named = true
+                notify(
+                    'session_name failed: ' .. tostring(value),
+                    vim.log.levels.WARN
+                )
+            end
+        end
+        return core_launch.session_label(path, vim.uv.os_homedir(), custom)
+    end
+
+    -- The first Session of the accepted snapshot with `label`, if any.
+    ---@param label string
+    ---@return rexai.ModelSession|nil
+    local function session_named(label)
+        for _, session in ipairs(data:sessions() or {}) do
+            if session.label == label then
+                return session
+            end
+        end
+    end
+
+    -- Asks for an agent and a directory and hands both to `create` with the
+    -- number of this press. A cancelled prompt ends the flow silently; a press
+    -- made after this one makes every continuation of this one return.
+    ---@param what string 'Window' or 'Session'
+    ---@param prefill string
+    ---@param create fun(agent: string, dir: string, mine: integer)
+    local function ask(what, prefill, create)
+        adds = adds + 1
+        local mine = adds
+
+        vim.ui.select(
+            config.get().agents.commands,
+            {
+                prompt = 'Agent for the new ' .. what,
+            },
+            guard(function(agent)
+                if mine ~= adds or agent == nil then
+                    return
+                end
+                vim.ui.input(
+                    {
+                        prompt = 'Directory of the new ' .. what,
+                        default = prefill,
+                    },
+                    guard(function(answer)
+                        if mine ~= adds or answer == nil then
+                            return
+                        end
+                        local dir = directory(answer)
+                        if not dir then
+                            return
+                        end
+                        if not is_directory(dir) then
+                            return notify(
+                                'not a directory: ' .. dir,
+                                vim.log.levels.WARN
+                            )
+                        end
+                        create(agent, dir, mine)
+                    end)
+                )
+            end)
+        )
+    end
+
+    -- Selects what a create made when `focus_new` says so, then asks Rex for a
+    -- snapshot. A failure on either step says why and refreshes too.
+    ---@param mine integer
+    ---@param err string|nil
+    ---@param target rexai.Target|nil
+    local function after_create(mine, err, target)
+        if mine ~= adds then
+            return
+        end
+        if err then
+            notify(err, vim.log.levels.WARN)
+            return refresh()
+        end
+        if not config.get().focus_new or not target then
+            return refresh()
+        end
+
+        backend.focus(
+            target,
+            guard(function(focus_err)
+                if mine ~= adds then
+                    return
+                end
+                if focus_err then
+                    notify(focus_err, vim.log.levels.WARN)
+                end
+                refresh()
+            end)
+        )
+    end
+
+    -- `n`: adds an Agent Window to the Session of the row under the cursor.
+    -- The directory starts at the row's own. The header of the Home session is
+    -- refused: a Window is added next to an Agent block, and it has none.
+    function object.new_window(_)
+        if disposed then
+            return
+        end
+        local target = current_target()
+        if not target then
+            return notify('put the cursor on a Session or an Agent block')
+        end
+        if target.home then
+            return notify(
+                'the Home session has no Agent block to add a Window next '
+                    .. 'to; use N'
+            )
+        end
+
+        local prefill = vim.uv.cwd()
+        if target.kind == 'row' then
+            local ctx = data:context(target.block_id)
+            if ctx and ctx.path then
+                prefill = ctx.path
+            end
+        end
+
+        local session_id = target.session_id
+        ask('Window', prefill, function(agent, dir, mine)
+            backend.create_window(
+                {
+                    session_id = session_id,
+                    name = agent,
+                    cwd = dir,
+                    command = core_launch.command(
+                        agent,
+                        config.get().agents.launch
+                    ),
+                    keep_open = true,
+                    focus = false,
+                },
+                guard(function(err, created)
+                    after_create(mine, err, created)
+                end)
+            )
+        end)
+    end
+
+    -- `N`: starts a Session with an Agent Window, or adds the Window to the
+    -- Session that already has the label of the directory.
+    function object.new_session(_)
+        if disposed then
+            return
+        end
+
+        ask('Session', vim.uv.cwd(), function(agent, dir, mine)
+            local label = session_label(dir)
+            local command =
+                core_launch.command(agent, config.get().agents.launch)
+            local existing = session_named(label)
+
+            if existing then
+                backend.create_window(
+                    {
+                        session_id = existing.id,
+                        name = agent,
+                        cwd = dir,
+                        command = command,
+                        keep_open = true,
+                        focus = false,
+                    },
+                    guard(function(err, created)
+                        after_create(mine, err, created)
+                    end)
+                )
+                return
+            end
+
+            backend.create_session(
+                {
+                    name = label,
+                    cwd = dir,
+                    window = agent,
+                    command = command,
+                    keep_open = true,
+                },
+                guard(function(err, created)
+                    after_create(mine, err, created)
+                end)
+            )
+        end)
     end
 
     function object.dispose(_)

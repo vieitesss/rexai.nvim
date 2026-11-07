@@ -163,6 +163,78 @@ local function runner()
     return r
 end
 
+-- The prompts the user sees. Every `vim.ui.select` and `vim.ui.input` waits
+-- here until the test answers it, and `calls` keeps every prompt, answered or
+-- not, in order.
+---@return table
+local function prompts()
+    local p = { calls = {}, open = {} }
+
+    ---@param entry table
+    local function record(entry)
+        p.calls[#p.calls + 1] = entry
+        p.open[#p.open + 1] = entry
+    end
+
+    ---@param items string[]
+    ---@param opts table
+    ---@param answer fun(choice: string|nil)
+    function p.select(items, opts, answer)
+        record({
+            kind = 'select',
+            items = items,
+            opts = opts,
+            answer = answer,
+        })
+    end
+
+    ---@param opts table
+    ---@param answer fun(text: string|nil)
+    function p.input(opts, answer)
+        record({
+            kind = 'input',
+            opts = opts,
+            default = opts and opts.default,
+            answer = answer,
+        })
+    end
+
+    ---@return table the oldest prompt the test has not answered
+    function p.next()
+        local entry = table.remove(p.open, 1)
+        assert.is_not_nil(entry, 'no prompt is open')
+        return entry
+    end
+
+    -- Answers the oldest prompt: `2` picks the second item, `'pi'` the item
+    -- itself and `nil` cancels, as `<Esc>` does.
+    ---@param choice integer|string|nil
+    function p.answer_select(choice)
+        local entry = p.next()
+        assert.are.equal('select', entry.kind)
+        local value = choice
+        if type(choice) == 'number' then
+            value = entry.items[choice]
+        end
+        entry.answer(value)
+    end
+
+    -- Answers the oldest prompt with `text`; nil cancels, as `<Esc>` does.
+    ---@param text string|nil
+    function p.answer_input(text)
+        local entry = p.next()
+        assert.are.equal('input', entry.kind)
+        entry.answer(text)
+    end
+
+    ---@return integer how many prompts the test has not answered
+    function p.count()
+        return #p.open
+    end
+
+    return p
+end
+
 -- A git clock the test moves by hand, in milliseconds.
 ---@return table
 local function clock()
@@ -212,6 +284,7 @@ end
 ---@field clock table the git cache's clock seam
 ---@field git table the git cache's run seam
 ---@field notify table what the Dashboard told the user
+---@field prompt table the `vim.ui` prompts the test answers
 ---@field opened integer|nil the Dashboard buffer this harness opened
 
 local Harness = {}
@@ -222,6 +295,7 @@ function M.new()
     local self = setmetatable({}, Harness)
     self.timer, self.clock, self.git, self.notify =
         timer(), clock(), runner(), notifier()
+    self.prompt = prompts()
 
     self.scratch = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_win_set_buf(0, self.scratch)
@@ -231,6 +305,10 @@ function M.new()
     vim.env.REX_SESSION = nil
     self.notify_fn = vim.notify
     vim.notify = self.notify.notify
+    self.select_fn = vim.ui.select
+    vim.ui.select = self.prompt.select
+    self.input_fn = vim.ui.input
+    vim.ui.input = self.prompt.input
     self.rex_module = package.loaded['rexai.backend.rex']
     self.loaded_rexai = vim.g.loaded_rexai
     self.saved_config = vim.deepcopy(config.get())
@@ -339,6 +417,8 @@ function Harness:close()
 
     package.loaded['rexai.backend.rex'] = self.rex_module
     vim.notify = self.notify_fn
+    vim.ui.select = self.select_fn
+    vim.ui.input = self.input_fn
     vim.env.REX_SESSION = self.rex_session
     vim.g.loaded_rexai = self.loaded_rexai
     config.setup(self.saved_config)

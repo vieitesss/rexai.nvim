@@ -204,7 +204,7 @@ describe('ui.render', function()
 
             local target = assert(out.targets[1])
             assert.are.same(
-                { kind = 'session', session_id = 'session:home' },
+                { kind = 'session', session_id = 'session:home', home = true },
                 target
             )
 

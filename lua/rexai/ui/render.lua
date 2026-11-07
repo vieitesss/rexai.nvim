@@ -23,6 +23,7 @@ M.ELLIPSIS = '…'
 ---@field session_id string
 ---@field window_id string|nil the Window of a row
 ---@field block_id string|nil the Block of a row
+---@field home boolean|nil true for the header of the Home session
 
 ---@class rexai.Render
 ---@field lines string[] the buffer, one entry per line
@@ -351,6 +352,9 @@ function M.build(sessions, opts)
         out.targets[push(header:line(), header.spans)] = {
             kind = 'session',
             session_id = session.id,
+            -- A row of the Home session is a normal row; only its header says
+            -- it is the Session that holds this Neovim.
+            home = session.id == o.home_session_id or nil,
         }
 
         if session.error then

@@ -377,6 +377,20 @@ local function keymaps(buf)
         nowait = true,
         desc = 'Peek at the Agent block',
     })
+    vim.keymap.set('n', 'n', function()
+        state.actions:new_window()
+    end, {
+        buffer = buf,
+        nowait = true,
+        desc = 'Add a Window to the Session',
+    })
+    vim.keymap.set('n', 'N', function()
+        state.actions:new_session()
+    end, {
+        buffer = buf,
+        nowait = true,
+        desc = 'Start a Session',
+    })
 end
 
 -- Forgets everything about the Dashboard once its buffer is wiped, so no
