@@ -1,9 +1,13 @@
 -- The Dashboard actions on the target under the cursor: `<CR>` goes to the
--- Agent block or Session and `d` hands the row to the `review` hook. One
--- object per Dashboard lifetime: it is bound to the Backend, the data object
--- and the hooks object it was created with, and `dispose` makes every pending
--- continuation a no-op, so a result never acts on a Dashboard that did not
--- issue the request.
+-- Agent block or Session, `d` hands the row to the `review` hook and `K` peeks
+-- at the Agent block. One object per Dashboard lifetime: it is bound to the
+-- Backend, the data object and the hooks object it was created with, and
+-- `dispose` makes every pending continuation a no-op, so a result never acts
+-- on a Dashboard that did not issue the request.
+
+local core_git = require('rexai.core.git')
+local core_peek = require('rexai.core.peek')
+local float = require('rexai.ui.peek')
 
 local M = {}
 
@@ -17,6 +21,7 @@ local M = {}
 ---@class rexai.Actions
 ---@field focus fun(self: rexai.Actions) goes to the Agent block or Session
 ---@field review fun(self: rexai.Actions) reviews the Agent block of the row
+---@field peek fun(self: rexai.Actions) shows the float of the Agent block
 ---@field dispose fun(self: rexai.Actions) drops every pending continuation
 
 ---@param opts rexai.ActionsOpts
@@ -30,6 +35,12 @@ function M.new(opts)
         assert(opts.current_target, 'actions need a current_target reader')
 
     local disposed = false
+
+    -- The Block whose float is open, and how many `K` presses there were: only
+    -- the newest press shows its result, so a slow one never covers a newer
+    -- one.
+    local peeked = nil
+    local peeks = 0
 
     local object = {}
 
@@ -120,8 +131,73 @@ function M.new(opts)
         hooks:review(review_ctx(ctx))
     end
 
+    -- `K`: shows the float of the Agent block under the cursor, or enters the
+    -- one already open. The result is shown only if it is the newest press,
+    -- the cursor is still on that Block and the Dashboard is still there: a
+    -- row and its directory are read when the text arrives, not when the key
+    -- is pressed.
+    function object.peek(_)
+        if disposed then
+            return
+        end
+        local target = current_target()
+        if not target or target.kind ~= 'row' then
+            return notify('put the cursor on an Agent block')
+        end
+        if peeked == target.block_id and float.is_open() then
+            return float.enter()
+        end
+
+        local block_id = target.block_id
+        peeks = peeks + 1
+        local mine = peeks
+
+        backend.peek(
+            {
+                session_id = target.session_id,
+                window_id = target.window_id,
+                block_id = block_id,
+            },
+            guard(function(err, text)
+                if mine ~= peeks then
+                    return
+                end
+                if err then
+                    notify(err, vim.log.levels.WARN)
+                    return refresh()
+                end
+
+                local here = current_target()
+                if
+                    not here
+                    or here.kind ~= 'row'
+                    or here.block_id ~= block_id
+                then
+                    return
+                end
+
+                local ctx = data:context(block_id)
+                if not ctx then
+                    return
+                end
+
+                float.show(
+                    core_peek.lines({
+                        row = ctx.row,
+                        path = ctx.path,
+                        git = ctx.git and core_git.format(ctx.git) or nil,
+                        screen = text,
+                    }),
+                    vim.api.nvim_get_current_win()
+                )
+                peeked = block_id
+            end)
+        )
+    end
+
     function object.dispose(_)
         disposed = true
+        float.close()
     end
 
     return object

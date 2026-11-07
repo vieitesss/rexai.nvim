@@ -41,6 +41,29 @@ function M.last_focus(calls)
     end
 end
 
+---@param calls table[]
+---@return table|nil the argument of the last `peek` call
+function M.last_peek(calls)
+    for index = #calls, 1, -1 do
+        if calls[index].method == 'peek' then
+            return calls[index].arg
+        end
+    end
+end
+
+-- Every float window Neovim shows, the Dashboard's `K` float included. A spec
+-- that checks for a leaked float finds it here.
+---@return integer[]
+function M.floats()
+    local out = {}
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+        if vim.api.nvim_win_get_config(win).relative ~= '' then
+            out[#out + 1] = win
+        end
+    end
+    return out
+end
+
 ---@param targets table<integer, rexai.RenderTarget>
 ---@param block_id string
 ---@return integer the line that Agent block is on
@@ -224,6 +247,21 @@ function Harness:lines()
     return vim.api.nvim_buf_get_lines(assert(self:buf()), 0, -1, false)
 end
 
+---@return integer|nil the float window shown, nil when there is none
+function Harness:float()
+    return M.floats()[1]
+end
+
+---@return string[]|nil the lines of the float window, nil when there is none
+function Harness:float_lines()
+    local win = self:float()
+    if not win then
+        return nil
+    end
+    local buf = vim.api.nvim_win_get_buf(win)
+    return vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+end
+
 -- Types `keys` in normal mode and waits for the Dashboard to handle them.
 ---@param keys string
 function Harness:press(keys)
@@ -233,14 +271,17 @@ end
 -- Shows the Dashboard in the current window. The fake Backend serves
 -- `opts.snapshots`, or `opts.backend` goes in as it is; the poller, the git
 -- cache and the hooks object get the harness seams.
----@param opts table|nil `backend` or `snapshots`, `home_session_id`
+---@param opts table|nil `backend` or `snapshots` and `peek`, `home_session_id`
 ---@return table backend
 ---@return table[]|nil calls every Backend call, in order
 function Harness:open(opts)
     opts = opts or {}
     local backend, calls = opts.backend, nil
     if not backend then
-        backend, calls = fake.new({ snapshots = opts.snapshots or {} })
+        backend, calls = fake.new({
+            snapshots = opts.snapshots or {},
+            peek = opts.peek,
+        })
     end
 
     dashboard.open({

@@ -1,8 +1,9 @@
--- The Dashboard actions on the target under the cursor: `<CR>` goes to it and
--- `d` hands the row to the `review` hook. The Backend holds every `focus`
--- until the test answers it, and the effects of the Dashboard (`refresh` and
--- the target reader) are stubs, so the test sees exactly what the actions ask
--- for. The data object is the real one, fed with an invented snapshot.
+-- The Dashboard actions on the target under the cursor: `<CR>` goes to it, `d`
+-- hands the row to the `review` hook and `K` peeks at its Block. The Backend
+-- holds every `focus` and `peek` until the test answers it, and the effects of
+-- the Dashboard (`refresh` and the target reader) are stubs, so the test sees
+-- exactly what the actions ask for. The data object is the real one, fed with
+-- an invented snapshot.
 
 local actions = require('rexai.ui.actions')
 local config = require('rexai.config')
@@ -71,10 +72,11 @@ local ROW = {
     cwd = '/work/orbit',
 }
 
--- A Backend that holds every `focus` until the test answers it.
+-- A Backend that holds every `focus` and every `peek` until the test answers
+-- it.
 ---@return table
 local function stub_backend()
-    local object = { targets = {}, pending = {} }
+    local object = { targets = {}, pending = {}, peeks = {}, peek_pending = {} }
 
     function object.focus(target, callback)
         object.targets[#object.targets + 1] = target
@@ -93,8 +95,9 @@ local function stub_backend()
         callback(nil)
     end
 
-    function object.peek(_, callback)
-        callback(nil, '')
+    function object.peek(target, callback)
+        object.peeks[#object.peeks + 1] = target
+        object.peek_pending[#object.peek_pending + 1] = callback
     end
 
     -- Answers the oldest focus call with `err`.
@@ -102,6 +105,14 @@ local function stub_backend()
     function object.answer(err)
         local callback = table.remove(object.pending, 1)
         assert.is_not_nil(callback, 'no focus call is waiting')
+        callback(err)
+    end
+
+    -- Answers the oldest peek call with `err`.
+    ---@param err string|nil
+    function object.answer_peek(err)
+        local callback = table.remove(object.peek_pending, 1)
+        assert.is_not_nil(callback, 'no peek call is waiting')
         callback(err)
     end
 
@@ -350,6 +361,73 @@ describe('ui.actions', function()
             object:review()
 
             assert.are.equal(0, ran)
+            assert.are.same({}, told.calls)
+        end)
+    end)
+
+    describe('peek', function()
+        it('reports a line with no Agent block and asks nothing', function()
+            object:peek()
+
+            assert.are.same({}, backend.peeks)
+            assert.are.equal(1, #told.calls)
+            assert.are.equal(
+                'rexai: put the cursor on an Agent block',
+                told.calls[1].message
+            )
+            assert.are.equal(vim.log.levels.INFO, told.calls[1].level)
+        end)
+
+        it('reports a Session header too', function()
+            target = HEADER
+
+            object:peek()
+
+            assert.are.same({}, backend.peeks)
+            assert.are.equal(
+                'rexai: put the cursor on an Agent block',
+                told.calls[1].message
+            )
+            assert.are.equal(vim.log.levels.INFO, told.calls[1].level)
+        end)
+
+        it('asks Rex for the whole target of the row', function()
+            target = ROW_IN_TREE
+
+            object:peek()
+
+            assert.are.same({
+                {
+                    session_id = 'session:s1',
+                    window_id = 'window:w1',
+                    block_id = 'block:b1',
+                },
+            }, backend.peeks)
+            assert.are.same({}, told.calls)
+        end)
+
+        it('warns and refreshes once when Rex cannot peek', function()
+            target = ROW_IN_TREE
+            object:peek()
+
+            backend.answer_peek('cannot read the Block')
+
+            assert.are.equal(1, #told.calls)
+            assert.are.equal(
+                'rexai: cannot read the Block',
+                told.calls[1].message
+            )
+            assert.are.equal(vim.log.levels.WARN, told.calls[1].level)
+            assert.are.equal(1, refreshed)
+        end)
+
+        it('makes no call once disposed', function()
+            target = ROW_IN_TREE
+            object:dispose()
+
+            object:peek()
+
+            assert.are.same({}, backend.peeks)
             assert.are.same({}, told.calls)
         end)
     end)

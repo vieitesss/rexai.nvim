@@ -370,6 +370,13 @@ local function keymaps(buf)
         nowait = true,
         desc = 'Review the Agent block',
     })
+    vim.keymap.set('n', 'K', function()
+        state.actions:peek()
+    end, {
+        buffer = buf,
+        nowait = true,
+        desc = 'Peek at the Agent block',
+    })
 end
 
 -- Forgets everything about the Dashboard once its buffer is wiped, so no

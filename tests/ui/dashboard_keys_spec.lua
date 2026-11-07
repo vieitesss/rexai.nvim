@@ -379,6 +379,7 @@ describe('ui.dashboard keys', function()
                     ['<CR>'] = 'Go to the Agent block or Session',
                     r = 'Refresh the Dashboard',
                     e = 'Toggle the Exited rows',
+                    K = 'Peek at the Agent block',
                 }
                 for lhs, desc in pairs(wanted) do
                     local map = vim.fn.maparg(lhs, 'n', false, true)
