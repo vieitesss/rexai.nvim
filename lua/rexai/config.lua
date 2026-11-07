@@ -26,6 +26,8 @@ local M = {}
 ---@field peek_lines integer lines `peek` keeps from the end of a Block
 ---@field glyphs rexai.Glyphs the glyph of every Agent status
 ---@field agents rexai.Agents what makes a Block an Agent block
+---@field resolve_path (fun(block: rexai.Row): string|nil)|nil the directory of a row
+---@field review (fun(ctx: table))|nil what the `d` key calls
 
 ---@type rexai.Config
 M.defaults = {
