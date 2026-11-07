@@ -21,6 +21,11 @@ test:
 		-u "${minimal_init}" \
 		-c "lua require('plenary.test_harness').test_directory('tests', { minimal_init = '${minimal_init}' })"
 
+# Run Neovim with the plugin from this checkout. Extra arguments go to nvim.
+[positional-arguments]
+dev *args:
+	nvim -u dev/init.lua "$@"
+
 # Check formatting.
 check:
 	stylua --check .
