@@ -21,6 +21,8 @@ local M = {}
 ---@field refresh_ms integer how often the Dashboard asks Rex for a snapshot
 ---@field show_exited boolean list the Agent blocks whose agent has ended
 ---@field title_width integer widest title, in display cells, `…` included
+---@field rex_bin string the `rex` executable the Backend runs
+---@field peek_lines integer lines `peek` keeps from the end of a Block
 ---@field glyphs rexai.Glyphs the glyph of every Agent status
 ---@field agents rexai.Agents what makes a Block an Agent block
 
@@ -29,6 +31,8 @@ M.defaults = {
     refresh_ms = 1000,
     show_exited = true,
     title_width = 40,
+    rex_bin = 'rex',
+    peek_lines = 20,
     glyphs = {
         needs_input = '!',
         error = 'x',
