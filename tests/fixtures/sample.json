@@ -1,0 +1,324 @@
+{
+  "sessions": [
+    {
+      "active_window_id": "window:00000000-0000-7000-8000-000000000001",
+      "id": "session:00000000-0000-7000-8000-000000000001",
+      "label": "session-1",
+      "windows": [
+        {
+          "blocks": [
+            {
+              "id": "block:00000000-0000-7000-8000-000000000001",
+              "label": "shell",
+              "process": {
+                "argv0": "/opt/bin/claude",
+                "child": {
+                  "name": "login",
+                  "path": "/opt/bin/login"
+                },
+                "cwd": "/work/project-1",
+                "name": "2.1.319"
+              },
+              "records": [
+                {
+                  "app": "claude-code",
+                  "effective_app": "claude-code",
+                  "state": "done",
+                  "updated_at": "2026-11-06T14:11:45.499979+01:00"
+                }
+              ],
+              "title": "title-1"
+            }
+          ],
+          "focused_block_id": "block:00000000-0000-7000-8000-000000000001",
+          "id": "window:00000000-0000-7000-8000-000000000001",
+          "label": "Window 00000001"
+        }
+      ]
+    },
+    {
+      "active_window_id": "window:00000000-0000-7000-8000-000000000004",
+      "id": "session:00000000-0000-7000-8000-000000000002",
+      "label": "session-2",
+      "windows": [
+        {
+          "blocks": [
+            {
+              "id": "block:00000000-0000-7000-8000-000000000002",
+              "label": "shell",
+              "process": {
+                "argv0": "/opt/bin/claude",
+                "child": {
+                  "name": "login",
+                  "path": "/opt/bin/login"
+                },
+                "cwd": "/work/project-2",
+                "name": "2.1.319"
+              },
+              "records": [
+                {
+                  "app": "claude-code",
+                  "effective_app": "claude-code",
+                  "state": "done",
+                  "updated_at": "2026-11-06T13:02:10.483225+01:00"
+                }
+              ],
+              "title": "title-1"
+            }
+          ],
+          "focused_block_id": "block:00000000-0000-7000-8000-000000000002",
+          "id": "window:00000000-0000-7000-8000-000000000002",
+          "label": "Window 00000002"
+        },
+        {
+          "blocks": [
+            {
+              "id": "block:00000000-0000-7000-8000-000000000003",
+              "label": "shell",
+              "process": {
+                "argv0": "nvim",
+                "child": {
+                  "name": "login",
+                  "path": "/opt/bin/login"
+                },
+                "cwd": "/work/project-2",
+                "name": "nvim"
+              },
+              "records": [],
+              "title": "title-2"
+            }
+          ],
+          "focused_block_id": "block:00000000-0000-7000-8000-000000000003",
+          "id": "window:00000000-0000-7000-8000-000000000003",
+          "label": "Window 00000003"
+        },
+        {
+          "blocks": [
+            {
+              "id": "block:00000000-0000-7000-8000-000000000004",
+              "label": "shell",
+              "process": {
+                "argv0": "claude",
+                "child": {
+                  "name": "login",
+                  "path": "/opt/bin/login"
+                },
+                "cwd": "/work/project-2",
+                "name": "2.1.319"
+              },
+              "records": [
+                {
+                  "app": "claude-code",
+                  "effective_app": "claude-code",
+                  "state": "done",
+                  "updated_at": "2026-11-06T20:53:15.734023+01:00"
+                }
+              ],
+              "title": "title-3"
+            }
+          ],
+          "focused_block_id": "block:00000000-0000-7000-8000-000000000004",
+          "id": "window:00000000-0000-7000-8000-000000000004",
+          "label": "Window 00000004"
+        }
+      ]
+    },
+    {
+      "active_window_id": "window:00000000-0000-7000-8000-000000000006",
+      "id": "session:00000000-0000-7000-8000-000000000003",
+      "label": "session-3",
+      "windows": [
+        {
+          "blocks": [
+            {
+              "id": "block:00000000-0000-7000-8000-000000000005",
+              "label": "shell",
+              "process": {
+                "argv0": "nvim",
+                "child": {
+                  "name": "login",
+                  "path": "/opt/bin/login"
+                },
+                "cwd": "/work/project-3",
+                "name": "nvim"
+              },
+              "records": [],
+              "title": "title-4"
+            }
+          ],
+          "focused_block_id": "block:00000000-0000-7000-8000-000000000005",
+          "id": "window:00000000-0000-7000-8000-000000000005",
+          "label": "Window 00000005"
+        },
+        {
+          "blocks": [
+            {
+              "id": "block:00000000-0000-7000-8000-000000000006",
+              "label": "shell",
+              "process": {
+                "argv0": "/opt/bin/claude",
+                "child": {
+                  "name": "login",
+                  "path": "/opt/bin/login"
+                },
+                "cwd": "/work/project-3",
+                "name": "2.1.318"
+              },
+              "records": [
+                {
+                  "app": "claude-code",
+                  "effective_app": "claude-code",
+                  "state": "idle",
+                  "updated_at": "2026-11-05T10:37:32.14487+01:00"
+                }
+              ],
+              "title": "title-5"
+            }
+          ],
+          "focused_block_id": "block:00000000-0000-7000-8000-000000000006",
+          "id": "window:00000000-0000-7000-8000-000000000006",
+          "label": "Window 00000006"
+        }
+      ]
+    },
+    {
+      "active_window_id": "window:00000000-0000-7000-8000-000000000007",
+      "id": "session:00000000-0000-7000-8000-000000000004",
+      "label": "session-4",
+      "windows": [
+        {
+          "blocks": [
+            {
+              "id": "block:00000000-0000-7000-8000-000000000007",
+              "label": "shell",
+              "process": {
+                "argv0": "claude",
+                "child": {
+                  "name": "login",
+                  "path": "/opt/bin/login"
+                },
+                "cwd": "/work/project-4",
+                "name": "2.1.319"
+              },
+              "records": [
+                {
+                  "app": "claude-code",
+                  "effective_app": "claude-code",
+                  "state": "done",
+                  "updated_at": "2026-11-07T16:09:39.374346+01:00"
+                }
+              ],
+              "title": "title-6"
+            }
+          ],
+          "focused_block_id": "block:00000000-0000-7000-8000-000000000007",
+          "id": "window:00000000-0000-7000-8000-000000000007",
+          "label": "Window 00000007"
+        },
+        {
+          "blocks": [
+            {
+              "id": "block:00000000-0000-7000-8000-000000000008",
+              "label": "shell",
+              "process": {
+                "argv0": "pi",
+                "child": {
+                  "name": "node",
+                  "path": "/opt/bin/node"
+                },
+                "cwd": "/work/project-4",
+                "name": "node"
+              },
+              "records": [
+                {
+                  "app": "pi",
+                  "effective_app": "pi",
+                  "state": "working",
+                  "updated_at": "2026-11-07T16:09:27.77404+01:00"
+                }
+              ],
+              "title": "title-7"
+            }
+          ],
+          "focused_block_id": "block:00000000-0000-7000-8000-000000000008",
+          "id": "window:00000000-0000-7000-8000-000000000008",
+          "label": "window-1"
+        }
+      ]
+    },
+    {
+      "active_window_id": "window:00000000-0000-7000-8000-000000000009",
+      "id": "session:00000000-0000-7000-8000-000000000005",
+      "label": "session-5",
+      "windows": [
+        {
+          "blocks": [
+            {
+              "id": "block:00000000-0000-7000-8000-000000000009",
+              "label": "shell",
+              "process": {
+                "argv0": "claude",
+                "child": {
+                  "name": "login",
+                  "path": "/opt/bin/login"
+                },
+                "cwd": "/work/project-5",
+                "name": "2.1.319"
+              },
+              "records": [
+                {
+                  "app": "claude-code",
+                  "effective_app": "claude-code",
+                  "msg": "msg-1",
+                  "state": "working",
+                  "updated_at": "2026-11-07T16:12:25.266825+01:00"
+                }
+              ],
+              "title": "title-8"
+            }
+          ],
+          "focused_block_id": "block:00000000-0000-7000-8000-000000000009",
+          "id": "window:00000000-0000-7000-8000-000000000009",
+          "label": "Window 00000009"
+        }
+      ]
+    },
+    {
+      "active_window_id": "window:00000000-0000-7000-8000-000000000010",
+      "id": "session:00000000-0000-7000-8000-000000000006",
+      "label": "session-6",
+      "windows": [
+        {
+          "blocks": [
+            {
+              "id": "block:00000000-0000-7000-8000-000000000010",
+              "label": "shell",
+              "process": {
+                "argv0": "claude",
+                "child": {
+                  "name": "login",
+                  "path": "/opt/bin/login"
+                },
+                "cwd": "/work/project-6",
+                "name": "2.1.319"
+              },
+              "records": [
+                {
+                  "app": "claude-code",
+                  "effective_app": "claude-code",
+                  "state": "done",
+                  "updated_at": "2026-11-07T15:55:05.509794+01:00"
+                }
+              ],
+              "title": "title-9"
+            }
+          ],
+          "focused_block_id": "block:00000000-0000-7000-8000-000000000010",
+          "id": "window:00000000-0000-7000-8000-000000000010",
+          "label": "Window 00000010"
+        }
+      ]
+    }
+  ],
+  "version": 1
+}
