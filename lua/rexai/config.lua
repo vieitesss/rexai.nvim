@@ -19,6 +19,7 @@ local M = {}
 
 ---@class rexai.Config
 ---@field refresh_ms integer how often the Dashboard asks Rex for a snapshot
+---@field git_refresh_ms integer how old a git result may be before it is asked again
 ---@field show_exited boolean list the Agent blocks whose agent has ended
 ---@field title_width integer widest title, in display cells, `…` included
 ---@field rex_bin string the `rex` executable the Backend runs
@@ -29,6 +30,7 @@ local M = {}
 ---@type rexai.Config
 M.defaults = {
     refresh_ms = 1000,
+    git_refresh_ms = 5000,
     show_exited = true,
     title_width = 40,
     rex_bin = 'rex',

@@ -3,6 +3,8 @@
 -- poller live here; the layout itself lives in `ui.render`.
 
 local config = require('rexai.config')
+local core_git = require('rexai.core.git')
+local git = require('rexai.git')
 local highlights = require('rexai.ui.highlights')
 local model = require('rexai.core.model')
 local poll = require('rexai.poll')
@@ -39,6 +41,7 @@ local state = {
     show_exited = nil,
     backend = nil,
     poller = nil,
+    git = nil,
     previous_buf = nil,
     focused = true,
     saved = {},
@@ -238,18 +241,66 @@ local function label_of_home(snapshot)
     end
 end
 
--- Draws what the model last gave, so `e` re-renders without asking Rex.
+-- The path whose work tree a row shows. It is the Block's directory today;
+-- the `resolve_path` hook of a later Work Item replaces this body, so `draw`
+-- is the only caller.
+---@param row rexai.Row
+---@return string|nil
+local function row_path(row)
+    return row.cwd
+end
+
+-- The git slot of every row the render will show, by Block id, and the paths
+-- the cache may keep. A row hidden by the `e` toggle is not asked about.
+---@param sessions rexai.ModelSession[]
+---@return table<string, string> slots
+---@return string[] paths
+local function git_slots(sessions)
+    local slots, paths = {}, {}
+    if not state.git then
+        return slots, paths
+    end
+
+    for _, session in ipairs(sessions) do
+        for _, row in ipairs(session.rows) do
+            if state.show_exited or row.status ~= 'exited' then
+                local path = row_path(row)
+                if path then
+                    state.git:request(path)
+                    paths[#paths + 1] = path
+                    local info = state.git:get(path)
+                    if info then
+                        slots[row.block_id] = core_git.format(info)
+                    end
+                end
+            end
+        end
+    end
+    return slots, paths
+end
+
+-- Draws what the model last gave, so `e` re-renders without asking Rex. Git
+-- is asked only while a window shows the buffer, so a Dashboard left behind
+-- makes no call.
 local function draw()
     if not state.sessions then
         return
     end
     local options = config.get()
+    local slots = {}
+    if state.git and #windows() > 0 then
+        local paths
+        slots, paths = git_slots(state.sessions)
+        state.git:retain(paths)
+    end
+
     show(render.build(state.sessions, {
         now = (state.now or os.time)(),
         show_exited = state.show_exited,
         title_width = options.title_width,
         home_session_id = state.home_session_id,
         home_label = state.home_label,
+        git = slots,
     }))
 end
 
@@ -350,6 +401,10 @@ end
 local function cleanup(group)
     stop_polling()
     state.poller = nil
+    if state.git then
+        state.git:stop()
+        state.git = nil
+    end
     state.buf = nil
     state.lines, state.highlights, state.targets = nil, nil, {}
     state.sessions, state.home_label, state.show_exited = nil, nil, nil
@@ -459,6 +514,22 @@ local function ensure_poller(opts)
         on_snapshot = on_snapshot,
         on_error = on_error,
     })
+
+    -- One git cache per Dashboard: the poller and the git object are replaced
+    -- together, and a result that arrives after that is dropped.
+    if state.git then
+        state.git:stop()
+    end
+    local git_opts = opts.git or {}
+    state.git = git.new({
+        run = git_opts.run,
+        clock = git_opts.clock,
+        on_change = function()
+            if is_buffer(state.buf) and #windows() > 0 then
+                draw()
+            end
+        end,
+    })
     return state.poller
 end
 
@@ -467,6 +538,7 @@ end
 ---@field after (fun(ms: integer, callback: fun()): fun())|nil
 ---@field now (fun(): number)|nil epoch seconds the ages are measured against
 ---@field home_session_id string|nil the Session that holds this Neovim
+---@field git table|nil test seam: `run` and `clock` of the git cache
 
 ---@param opts rexai.DashboardOpts|nil
 function M.open(opts)
