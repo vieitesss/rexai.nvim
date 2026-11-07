@@ -1,7 +1,9 @@
 -- A stand-in for the `rex` command. Tests put it first on PATH, through the
 -- one-line `rex` wrapper that `tests/rex_stub.lua` writes. It never talks to a
 -- real Rex: it replays a prepared snapshot and answers the few commands the
--- rex Backend runs.
+-- rex Backend runs, plus the read-only ones `:checkhealth rexai` asks for
+-- (`whoami`, `client ls`), which come from the `whoami` and `clients` keys of
+-- the state.
 --
 --   nvim --headless --noplugin -u NONE -l tests/stub/rex.lua DIR ARGS...
 --
@@ -87,6 +89,13 @@ if argv[1] == '--autostart=false' then
 end
 
 local command = argv[1]
+
+-- The read-only calls `:checkhealth rexai` makes.
+if command == 'whoami' then
+    out(state.whoami or {})
+elseif command == 'client' and argv[2] == 'ls' then
+    out({ clients = state.clients or {} })
+end
 
 if command == 'do' then
     local script = vim.fs.basename(argv[2])

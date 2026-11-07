@@ -12,6 +12,8 @@ local M = {}
 ---@field delay_ms integer|nil every call waits this long first
 ---@field fail { code: integer, message: string }|nil every call fails
 ---@field stdout string|nil raw text every call prints instead of its answer
+---@field whoami table|nil what the `whoami --json` of `:checkhealth rexai` prints
+---@field clients table[]|nil what the `client ls --json` of `:checkhealth rexai` prints
 
 ---@class rexai.Stub
 ---@field dir string
