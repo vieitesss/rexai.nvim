@@ -6,6 +6,7 @@ local config = require('rexai.config')
 local core_git = require('rexai.core.git')
 local git = require('rexai.git')
 local highlights = require('rexai.ui.highlights')
+local hooks = require('rexai.hooks')
 local model = require('rexai.core.model')
 local poll = require('rexai.poll')
 local render = require('rexai.ui.render')
@@ -37,6 +38,8 @@ local state = {
     highlights = nil,
     targets = {},
     sessions = nil,
+    paths = nil,
+    hooks = nil,
     home_label = nil,
     show_exited = nil,
     backend = nil,
@@ -241,13 +244,13 @@ local function label_of_home(snapshot)
     end
 end
 
--- The path whose work tree a row shows. It is the Block's directory today;
--- the `resolve_path` hook of a later Work Item replaces this body, so `draw`
--- is the only caller.
+-- The path whose work tree a row shows. It comes from `resolve_path`, which
+-- the snapshot callback runs once per row, and is filled in for the rows of
+-- the last snapshot only.
 ---@param row rexai.Row
 ---@return string|nil
 local function row_path(row)
-    return row.cwd
+    return state.paths and state.paths[row.block_id]
 end
 
 -- The git slot of every row the render will show, by Block id, and the paths
@@ -304,9 +307,24 @@ local function draw()
     }))
 end
 
+-- The path of every row of a snapshot, by Block id, Exited rows included.
+-- The hook runs here and only here: `e` and a git redraw reuse the paths.
+---@param sessions rexai.ModelSession[]
+---@return table<string, string|nil>
+local function paths_of(sessions)
+    local paths = {}
+    for _, session in ipairs(sessions) do
+        for _, row in ipairs(session.rows) do
+            paths[row.block_id] = state.hooks:resolve(row)
+        end
+    end
+    return paths
+end
+
 local function on_snapshot(snapshot)
     local options = config.get()
     state.sessions = model.build(snapshot, options.agents, MEMORY)
+    state.paths = paths_of(state.sessions)
     state.home_label = label_of_home(snapshot)
     draw()
 end
@@ -369,6 +387,63 @@ local function toggle_exited()
     draw()
 end
 
+---@param message string
+---@param level integer|nil INFO unless said
+local function notify(message, level)
+    vim.notify('rexai: ' .. message, level or vim.log.levels.INFO)
+end
+
+-- The row and its Session by Block id, from the last snapshot.
+---@param block_id string
+---@return rexai.Row|nil row
+---@return rexai.ModelSession|nil session
+local function row_of(block_id)
+    for _, session in ipairs(state.sessions or {}) do
+        for _, row in ipairs(session.rows) do
+            if row.block_id == block_id then
+                return row, session
+            end
+        end
+    end
+end
+
+-- What `review` gets for one row: the directory it stands for, what git knows
+-- about it, and the row itself.
+---@param row rexai.Row
+---@param session rexai.ModelSession
+---@return table
+local function review_ctx(row, session)
+    local path = row_path(row)
+    local info = path and state.git and state.git:get(path) or nil
+    return {
+        path = path,
+        repo_root = info and info.root or nil,
+        branch = info and info.branch or nil,
+        session = { id = session.id, label = session.label },
+        window = { id = row.window_id },
+        block = vim.deepcopy(row),
+    }
+end
+
+-- `d`: hands the row under the cursor to the `review` hook. A miss says why,
+-- in the order a user runs into it: no row, no directory, no hook set.
+local function review_row()
+    local target = M.current_target()
+    local row, session
+    if target and target.kind == 'row' then
+        row, session = row_of(target.block_id)
+    end
+    if not row then
+        return notify('put the cursor on an Agent block')
+    end
+
+    local ctx = review_ctx(row, session)
+    if not ctx.path then
+        return notify('this Block has no directory to review')
+    end
+    state.hooks:review(ctx)
+end
+
 -- Every normal-mode key of the Dashboard. Later Work Items add their keys
 -- here.
 ---@param buf integer
@@ -393,6 +468,11 @@ local function keymaps(buf)
         nowait = true,
         desc = 'Toggle the Exited rows',
     })
+    vim.keymap.set('n', 'd', review_row, {
+        buffer = buf,
+        nowait = true,
+        desc = 'Review the Agent block',
+    })
 end
 
 -- Forgets everything about the Dashboard once its buffer is wiped, so no
@@ -408,6 +488,8 @@ local function cleanup(group)
     state.buf = nil
     state.lines, state.highlights, state.targets = nil, nil, {}
     state.sessions, state.home_label, state.show_exited = nil, nil, nil
+    state.paths = nil
+    state.hooks = nil
     state.backend = nil
     state.previous_buf = nil
     state.focused = true
@@ -530,6 +612,11 @@ local function ensure_poller(opts)
             end
         end,
     })
+
+    -- One hooks object per Dashboard too: a hook that failed reports once per
+    -- open, and `cleanup` starts that count again.
+    local hooks_opts = opts.hooks or {}
+    state.hooks = hooks.new({ notify = hooks_opts.notify })
     return state.poller
 end
 
@@ -539,6 +626,7 @@ end
 ---@field now (fun(): number)|nil epoch seconds the ages are measured against
 ---@field home_session_id string|nil the Session that holds this Neovim
 ---@field git table|nil test seam: `run` and `clock` of the git cache
+---@field hooks table|nil test seam: `notify` of the hooks object
 
 ---@param opts rexai.DashboardOpts|nil
 function M.open(opts)
