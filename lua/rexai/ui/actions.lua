@@ -235,13 +235,21 @@ function M.new(opts)
 
     -- Asks for an agent and a directory and hands both to `create` with the
     -- number of this press. A cancelled prompt ends the flow silently; a press
-    -- made after this one makes every continuation of this one return.
+    -- made after this one makes every continuation of this one return. With no
+    -- agent configured there is nothing to choose, so the press only says so.
     ---@param what string 'Window' or 'Session'
     ---@param prefill string|nil directory the prompt starts at
     ---@param create fun(agent: string, dir: string, mine: integer)
     local function ask(what, prefill, create)
         adds = adds + 1
         local mine = adds
+
+        if #config.get().agents.commands == 0 then
+            return notify(
+                'no agent is configured; set agents.commands in setup()',
+                vim.log.levels.WARN
+            )
+        end
 
         vim.ui.select(
             config.get().agents.commands,
