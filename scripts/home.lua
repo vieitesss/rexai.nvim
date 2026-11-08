@@ -13,6 +13,7 @@
 -- number. Without a `cwd` and without a readable HOME the script fails.
 
 local FLAVOR = 'com.superlogical.terminal.shell'
+local TERMINAL = 'com.superlogical.terminal'
 local DEFAULT_NAME = 'rexai'
 local WINDOW_LABEL = 'dashboard'
 
@@ -79,17 +80,63 @@ local function layout()
     }
 end
 
--- The first Block of a Window, in layout order: its layers, then each layer's
+-- The Blocks of a Window, in layout order: its layers, then each layer's
 -- blocks.
-local function first_block(window)
+---@param window table
+---@return table[]
+local function window_blocks(window)
+    local blocks = {}
     for _, layer in ipairs(window.layers or {}) do
         for _, block in ipairs(layer.blocks or {}) do
             if block.block_id then
+                blocks[#blocks + 1] = block
+            end
+        end
+    end
+    return blocks
+end
+
+-- Whether a Block runs Neovim, from the process the terminal reports in the
+-- foreground. Only a terminal Block runs a program, and a Block Rex cannot
+-- describe is not the one.
+---@param session_id string
+---@param block table
+---@return boolean
+local function runs_nvim(session_id, block)
+    if (block.flavor or ''):find(TERMINAL, 1, true) ~= 1 then
+        return false
+    end
+    local ok, process = pcall(rex.block.call, TERMINAL, 'process', {
+        session_id = session_id,
+        block_id = block.block_id,
+    })
+    if not ok or type(process) ~= 'table' then
+        return false
+    end
+    local foreground = process.foreground or {}
+    local command = foreground.argv0 or foreground.name
+    if not command then
+        return false
+    end
+    return (tostring(command):gsub('.*/', '')) == 'nvim'
+end
+
+-- The Block that runs the Dashboard: the one that runs Neovim. A Window with
+-- one Block needs no asking, and the first Block in layout order stands in
+-- when no Block can be told apart.
+---@param session_id string
+---@param window table
+---@return string|nil
+local function dashboard_block(session_id, window)
+    local blocks = window_blocks(window)
+    if #blocks > 1 then
+        for _, block in ipairs(blocks) do
+            if runs_nvim(session_id, block) then
                 return block.block_id
             end
         end
     end
-    return nil
+    return (blocks[1] or {}).block_id
 end
 
 local sessions = call('session.list').sessions or {}
@@ -157,7 +204,7 @@ if not window then
     }
 end
 
-local block_id = first_block(window)
+local block_id = dashboard_block(session_id, window)
 if not block_id then
     fail('the dashboard Window has no Block')
 end
