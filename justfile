@@ -26,9 +26,31 @@ test:
 dev *args:
 	nvim -u dev/init.lua "$@"
 
-# Check formatting.
+# Check formatting and types. Needs `stylua`, `nvim` and `lua-language-server`.
 check:
+	#!/usr/bin/env bash
+	set -euo pipefail
+
 	stylua --check .
+
+	# LuaLS reads `vim.*` from the runtime of an installed Neovim. Asking that
+	# Neovim for it keeps the path out of `.luarc.json` and out of this recipe.
+	runtime="$(nvim --headless --noplugin -u NONE \
+		-c 'lua io.stdout:write(vim.env.VIMRUNTIME)' -c 'qa!' 2>/dev/null)"
+	if test -z "${runtime}"; then
+		echo 'check: nvim reported no VIMRUNTIME' >&2
+		exit 1
+	fi
+
+	scratch="$(mktemp -d)"
+	trap 'rm -rf "${scratch}"' EXIT
+
+	VIMRUNTIME="${runtime}" lua-language-server \
+		--check=. \
+		--checklevel=Warning \
+		--check_format=pretty \
+		--logpath="${scratch}/log" \
+		--metapath="${scratch}/meta"
 
 # Format every Lua file.
 format:
