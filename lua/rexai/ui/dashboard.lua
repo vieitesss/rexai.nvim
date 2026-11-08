@@ -296,7 +296,7 @@ local function show(out)
 end
 
 -- The git slot of every row the render will show, by Block id, and the paths
--- the cache may keep. A row hidden by the `e` toggle is not asked about.
+-- the cache may keep. A row hidden by the `x` toggle is not asked about.
 ---@param sessions rexai.ModelSession[]
 ---@return table<string, string> slots
 ---@return string[] paths
@@ -324,7 +324,7 @@ local function git_slots(sessions)
     return slots, paths
 end
 
--- Draws what the model last gave, so `e` re-renders without asking Rex. Git
+-- Draws what the model last gave, so `x` re-renders without asking Rex. Git
 -- is asked only while a window shows the buffer, so a Dashboard left behind
 -- makes no call.
 local function draw()
@@ -385,19 +385,19 @@ local function refresh_now()
     end
 end
 
--- `e`: shows or hides the Exited rows. The buffer is the feedback, and the
+-- `x`: shows or hides the Exited rows. The buffer is the feedback, and the
 -- toggle is Dashboard state, not config.
 local function toggle_exited()
     state.show_exited = not state.show_exited
     draw()
 end
 
--- Every normal-mode key of the Dashboard, in the order `?` lists them: the key,
+-- Every normal-mode key of the Dashboard, in the order `g?` lists them: the key,
 -- what it does (the `desc` of its keymap) and what it runs.
 ---@type { [1]: string, [2]: string, [3]: fun() }[]
 local KEYS
 
--- `?`: a float at the cursor with every key of the Dashboard. It closes as
+-- `g?`: a float at the cursor with every key of the Dashboard. It closes as
 -- soon as the cursor moves, like the float of `K`.
 local function show_keys()
     state.actions:cancel_peek()
@@ -405,21 +405,11 @@ local function show_keys()
 end
 
 KEYS = {
-    { 'q', 'Close the Dashboard', quit },
     {
         '<CR>',
         'Go to the Agent block or Session',
         function()
             state.actions:focus()
-        end,
-    },
-    { 'r', 'Refresh the Dashboard', ask_rex },
-    { 'e', 'Toggle the Exited rows', toggle_exited },
-    {
-        'd',
-        'Review the Agent block',
-        function()
-            state.actions:review()
         end,
     },
     {
@@ -430,20 +420,30 @@ KEYS = {
         end,
     },
     {
-        'n',
+        'o',
+        'Review the Agent block',
+        function()
+            state.actions:review()
+        end,
+    },
+    { 'r', 'Refresh the Dashboard', ask_rex },
+    { 'x', 'Toggle the Exited rows', toggle_exited },
+    {
+        'a',
         'Add a Window to the Session',
         function()
             state.actions:new_window()
         end,
     },
     {
-        'N',
+        'A',
         'Start a Session',
         function()
             state.actions:new_session()
         end,
     },
-    { '?', 'Show these keys', show_keys },
+    { 'q', 'Close the Dashboard', quit },
+    { 'g?', 'Show these keys', show_keys },
 }
 
 ---@param buf integer
@@ -546,7 +546,7 @@ end
 -- the next snapshot draws over the error.
 ---@param err string
 local function on_error(err)
-    -- The rows of the last snapshot are stale, so `e` leaves the error alone
+    -- The rows of the last snapshot are stale, so `x` leaves the error alone
     -- until a snapshot succeeds.
     state.data:clear()
     show(render.build({}, { error = err, now = (state.now or os.time)() }))
@@ -615,7 +615,7 @@ local function ensure_poller(opts)
         memory = MEMORY,
     })
 
-    -- `<CR>` and `d`: one object per Dashboard, so a late result of an older
+    -- `<CR>` and `o`: one object per Dashboard, so a late result of an older
     -- one is dropped by its `dispose`.
     state.actions = actions.new({
         backend = backend,

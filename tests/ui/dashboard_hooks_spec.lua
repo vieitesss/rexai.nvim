@@ -1,5 +1,5 @@
 -- The two user hooks in the Dashboard: `resolve_path` decides the directory
--- a row stands for (git and the `d` key use it), and `d` hands the row under
+-- a row stands for (git and the `o` key use it), and `o` hands the row under
 -- the cursor to `review`. The fake Backend serves invented snapshots, and the
 -- git runner, git clock and timer are seams.
 
@@ -168,7 +168,7 @@ describe('ui.dashboard hooks', function()
             })
             assert.are.same({ 'block:b1', 'block:b2' }, seen)
 
-            h:press('e')
+            h:press('x')
             assert.are.same({ 'block:b1', 'block:b2' }, seen)
 
             h.timer.fire()
@@ -178,7 +178,7 @@ describe('ui.dashboard hooks', function()
             )
 
             -- The Exited row is hidden now, and the hook still does not run.
-            h:press('e')
+            h:press('x')
             assert.are.equal(4, #seen)
         end)
 
@@ -202,7 +202,7 @@ describe('ui.dashboard hooks', function()
         end)
     end)
 
-    describe('d', function()
+    describe('o', function()
         -- One Session with one Agent block in a work tree.
         local ONE = snap.snapshot({
             snap.session({
@@ -252,7 +252,7 @@ describe('ui.dashboard hooks', function()
             support.flush()
             put_cursor_on(ONE, 'block:b1')
 
-            h:press('d')
+            h:press('o')
 
             assert.are.equal(1, #got)
             assert.are.same({
@@ -281,7 +281,7 @@ describe('ui.dashboard hooks', function()
                 open_with(ONE)
                 put_cursor_on(ONE, 'block:b1')
 
-                h:press('d')
+                h:press('o')
 
                 assert.are.equal(HOOKED, got.path)
                 assert.is_nil(got.repo_root)
@@ -302,7 +302,7 @@ describe('ui.dashboard hooks', function()
                 0,
             })
 
-            h:press('d')
+            h:press('o')
 
             assert.are.equal(0, calls)
             assert.are.equal(1, #h.notify.calls)
@@ -343,7 +343,7 @@ describe('ui.dashboard hooks', function()
             open_with(bare)
             put_cursor_on(bare, 'block:b1')
 
-            h:press('d')
+            h:press('o')
 
             assert.are.equal(0, calls)
             assert.are.equal(1, #h.notify.calls)
@@ -358,7 +358,7 @@ describe('ui.dashboard hooks', function()
             open_with(ONE)
             put_cursor_on(ONE, 'block:b1')
 
-            h:press('d')
+            h:press('o')
 
             assert.are.equal(1, #h.notify.calls)
             assert.are.equal(vim.log.levels.INFO, h.notify.calls[1].level)
@@ -381,7 +381,7 @@ describe('ui.dashboard hooks', function()
                 assert.are.equal(1, support.count(calls, 'snapshot'))
                 put_cursor_on(ONE, 'block:b1')
 
-                h:press('d')
+                h:press('o')
 
                 assert.are.equal(1, #h.notify.calls)
                 assert.are.equal(vim.log.levels.WARN, h.notify.calls[1].level)

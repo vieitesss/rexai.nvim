@@ -701,7 +701,7 @@ describe('ui.dashboard peek', function()
             assert.are.equal(0, #support.floats())
         end)
 
-        it('keeps a `?` help float over a line with no Agent block', function()
+        it('keeps a `g?` help float over a line with no Agent block', function()
             -- The first Session leaves the snapshot, so the buffer changes
             -- and the cursor stays on line 3. That line has no Agent block,
             -- so nothing it described is gone and the float stays.
@@ -710,7 +710,7 @@ describe('ui.dashboard peek', function()
             h:open({ snapshots = { TWO, shorter }, home_session_id = HOME })
             put_cursor_on_line(3)
             assert.are.equal('', h:lines()[3])
-            h:press('?')
+            h:press('g?')
             assert.is_not_nil(h:float())
 
             poll()
@@ -907,7 +907,7 @@ describe('ui.dashboard peek', function()
         end)
 
         it(
-            'closes a `?` float of a Session an identical frame replaces',
+            'closes a `g?` float of a Session an identical frame replaces',
             function()
                 local backend =
                     staged_backend(one_row('session:s1', 'block:b1'))
@@ -917,7 +917,7 @@ describe('ui.dashboard peek', function()
                     'session:s1',
                     dashboard.current_target().session_id
                 )
-                h:press('?')
+                h:press('g?')
                 assert.is_not_nil(h:float())
 
                 backend.frame = one_row('session:new', 'block:b1')

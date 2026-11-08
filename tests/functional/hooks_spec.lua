@@ -1,5 +1,5 @@
 -- The three user hooks: `resolve_path` decides the directory a row stands
--- for, `review` receives the context of the row the `d` key is on, and
+-- for, `review` receives the context of the row the `o` key is on, and
 -- `session_name` names a new Session. All are plain functions read from the
 -- config at call time.
 

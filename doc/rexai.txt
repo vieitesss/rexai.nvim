@@ -89,27 +89,28 @@ Agent statuses and their default glyphs:
 ==============================================================================
 4. KEYS                                                           *rexai-keys*
 
-These keys work in the Dashboard buffer, in normal mode.
+These keys work in the Dashboard buffer, in normal mode. The Dashboard maps
+only keys that edit text, which a read-only buffer never needs, so Vim keeps
+its own meaning for d, e, n, N and ?.
 
-    q     Close the Dashboard. Shows the buffer that was in the window
-          before. Closes the window when that buffer is gone and other
-          windows exist.
     <CR>  Go to the Agent block under the cursor, or to the Session of a
           header. Rex changes the view itself.
-    r     Ask Rex for a snapshot now.
-    e     Show or hide the Exited rows. The choice lasts until the
-          Dashboard buffer is wiped. It is not a config option.
-    d     Hand the row under the cursor to the review hook. See
-          |rexai-hooks|.
     K     Open a float with what is known about the Agent block, and the
           last lines of its screen. Press K again to enter the float. q
           or <Esc> close it. The float closes when the cursor moves.
-    n     Add a Window to the Session under the cursor. See
+    o     Hand the row under the cursor to the review hook. See
+          |rexai-hooks|.
+    r     Ask Rex for a snapshot now.
+    x     Show or hide the Exited rows. The choice lasts until the
+          Dashboard buffer is wiped. It is not a config option.
+    a     Add a Window to the Session under the cursor. See
           |rexai-starting|.
-    N     Start a Session for a directory you name. See |rexai-starting|.
-    ?     Open a float with one line per Dashboard key, the key and what
-          it does. It replaces Vim's backward search in the Dashboard
-          buffer. The float is the one K opens: it closes when the cursor
+    A     Start a Session for a directory you name. See |rexai-starting|.
+    q     Close the Dashboard. Shows the buffer that was in the window
+          before. Closes the window when that buffer is gone and other
+          windows exist.
+    g?    Open a float with one line per Dashboard key, the key and what
+          it does. The float is the one K opens: it closes when the cursor
           moves, on entering Insert mode, or when the buffer is left.
 
 ==============================================================================
@@ -123,7 +124,7 @@ do not set. Without setup(), the defaults apply.
                     Rex for a snapshot.
     git_refresh_ms  integer, default 5000. How old a git result may be
                     before it is asked again.
-    show_exited     boolean, default true. The starting value of the `e`
+    show_exited     boolean, default true. The starting value of the `x`
                     toggle: whether Exited rows are listed.
     title_width     integer, default 40. The widest title, in display
                     cells, the ellipsis included.
@@ -131,7 +132,7 @@ do not set. Without setup(), the defaults apply.
                     and |:checkhealth| run.
     peek_lines      integer, default 20. How many lines from the end of a
                     Block the K float keeps.
-    focus_new       boolean, default true. Whether `n` and `N` select the
+    focus_new       boolean, default true. Whether `a` and `A` select the
                     Window or Session they made. false leaves the view
                     where it is.
     session_name    function or nil, default nil. Names a new Session from
@@ -140,14 +141,14 @@ do not set. Without setup(), the defaults apply.
                     See the default below.
     resolve_path    function or nil, default nil. Gives the directory a row
                     stands for. See |rexai-hooks|.
-    review          function or nil, default nil. What `d` calls with the
+    review          function or nil, default nil. What `o` calls with the
                     context of a row. See |rexai-hooks|.
     agents.apps     list, default { 'claude-code', 'pi' }. `app` names in
                     Rex program status records that make a Block an Agent
                     block.
     agents.commands list, default { 'claude', 'codex', 'opencode', 'pi' }.
                     Foreground command names that make a Block an Agent
-                    block, and the agents `n` and `N` offer. An empty list
+                    block, and the agents `a` and `A` offer. An empty list
                     makes both refuse.
     agents.launch   table, default {}. Maps an agent name to the full argv
                     that starts it.
@@ -180,7 +181,7 @@ The full setup() call with every default: >lua
         },
         -- nil: a row stands for the directory of its Block.
         resolve_path = nil,
-        -- nil: `d` only says that no review function is set.
+        -- nil: `o` only says that no review function is set.
         review = nil,
     })
 <
@@ -196,7 +197,7 @@ The hook runs for every row of every snapshot, so keep it cheap. It gets a
 copy of the row, with block_id, session_id, window_id, harness, label,
 status, title and cwd. It returns an absolute directory. A non-empty string
 wins. nil or '' keeps row.cwd. The plugin does not expand `~`; use
-vim.fn.expand(). The git slot, `d` and `n` all use the directory it
+vim.fn.expand(). The git slot, `o` and `a` all use the directory it
 returns. >lua
     require('rexai').setup({
         resolve_path = function(row)
@@ -207,8 +208,8 @@ returns. >lua
     })
 <
 review ~
-`d` calls review with the context of the row under the cursor. ctx.path is
-always set, because `d` does not call the hook for a row with no directory.
+`o` calls review with the context of the row under the cursor. ctx.path is
+always set, because `o` does not call the hook for a row with no directory.
 >lua
     require('rexai').setup({
         review = function(ctx)
@@ -222,13 +223,13 @@ always set, because `d` does not call the hook for a row with no directory.
     })
 <
 When the hook throws, the Dashboard warns with the error. Without a hook,
-`d` says: rexai: no review function is set; add review = function(ctx) ...
+`o` says: rexai: no review function is set; add review = function(ctx) ...
 end to setup()
 
 session_name ~
-`N` asks for a directory and calls session_name with that absolute path,
+`A` asks for a directory and calls session_name with that absolute path,
 ~ expanded and no trailing slash. The label it returns names the new
-Session. `N` looks for a Session with that label first: if one exists, `N`
+Session. `A` looks for a Session with that label first: if one exists, `A`
 adds a Window to it. >lua
     require('rexai').setup({
         session_name = function(path)
@@ -258,12 +259,12 @@ is ignored, and the bare name starts the agent. >lua
 ==============================================================================
 7. STARTING AGENT BLOCKS                                      *rexai-starting*
 
-`n` asks for an agent from agents.commands, then for a directory that starts
+`a` asks for an agent from agents.commands, then for a directory that starts
 at the row's directory. It adds a Window to the Session under the cursor.
 On the header of the Home session it refuses, because a Window is added
-next to an Agent block and the Home session may have none. Use `N` there.
+next to an Agent block and the Home session may have none. Use `A` there.
 
-`N` asks for an agent, then for a directory that starts at Neovim's current
+`A` asks for an agent, then for a directory that starts at Neovim's current
 directory. It starts a Session labelled by session_name, or adds a Window to
 the Session that already has that label.
 

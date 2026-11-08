@@ -321,7 +321,7 @@ describe('ui.data', function()
             assert.are.equal('main', ctx.git.branch)
         end)
 
-        it('keeps the path of a row the `e` toggle hides', function()
+        it('keeps the path of a row the `x` toggle hides', function()
             local d = object()
             d:accept(SNAPSHOT, nil)
             d:accept(ENDED, nil)

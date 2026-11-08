@@ -1,4 +1,4 @@
--- The Dashboard actions on the target under the cursor: `<CR>` goes to it, `d`
+-- The Dashboard actions on the target under the cursor: `<CR>` goes to it, `o`
 -- hands the row to the `review` hook and `K` peeks at its Block. The Backend
 -- holds every `focus` and `peek` until the test answers it, and the effects of
 -- the Dashboard (`refresh` and the target reader) are stubs, so the test sees
@@ -552,7 +552,7 @@ describe('ui.actions', function()
         end)
     end)
 
-    -- The `n` and `N` keys start a new Agent block: the agent comes from a
+    -- The `a` and `A` keys start a new Agent block: the agent comes from a
     -- select, the directory from an input, and the create from the Backend.
     -- Every directory is a temporary one this spec makes and removes.
     describe('a new Agent block', function()
@@ -693,7 +693,7 @@ describe('ui.actions', function()
                 assert.are.equal(1, #told.calls)
                 assert.are.equal(
                     'rexai: the Home session has no Agent block to add a '
-                        .. 'Window next to; use N',
+                        .. 'Window next to; use A',
                     told.calls[1].message
                 )
                 assert.are.equal(vim.log.levels.INFO, told.calls[1].level)

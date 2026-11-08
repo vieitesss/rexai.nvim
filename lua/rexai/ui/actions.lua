@@ -1,5 +1,5 @@
 -- The Dashboard actions on the target under the cursor: `<CR>` goes to the
--- Agent block or Session, `d` hands the row to the `review` hook and `K` peeks
+-- Agent block or Session, `o` hands the row to the `review` hook and `K` peeks
 -- at the Agent block. One object per Dashboard lifetime: it is bound to the
 -- Backend, the data object and the hooks object it was created with, and
 -- `dispose` makes every pending continuation a no-op, so a result never acts
@@ -47,7 +47,7 @@ function M.new(opts)
     local peeked = nil
     local peeks = 0
 
-    -- How many `n` and `N` presses there were: only the newest press creates,
+    -- How many `a` and `A` presses there were: only the newest press creates,
     -- so a second press while the first prompt is open never creates twice.
     local adds = 0
 
@@ -119,7 +119,7 @@ function M.new(opts)
         }
     end
 
-    -- `d`: hands the row under the cursor to the `review` hook. A miss says
+    -- `o`: hands the row under the cursor to the `review` hook. A miss says
     -- why, in the order a user runs into it: no row, no directory, no hook
     -- set.
     function object.review(_)
@@ -329,7 +329,7 @@ function M.new(opts)
         )
     end
 
-    -- `n`: adds an Agent Window to the Session of the row under the cursor.
+    -- `a`: adds an Agent Window to the Session of the row under the cursor.
     -- The directory starts at the row's own. The header of the Home session is
     -- refused: a Window is added next to an Agent block, and it has none.
     function object.new_window(_)
@@ -343,7 +343,7 @@ function M.new(opts)
         if target.home then
             return notify(
                 'the Home session has no Agent block to add a Window next '
-                    .. 'to; use N'
+                    .. 'to; use A'
             )
         end
 
@@ -376,7 +376,7 @@ function M.new(opts)
         end)
     end
 
-    -- `N`: starts a Session with an Agent Window, or adds the Window to the
+    -- `A`: starts a Session with an Agent Window, or adds the Window to the
     -- Session that already has the label of the directory. The data object
     -- holds every Session Rex reported, so a Session with no Agent blocks is
     -- reused too instead of being started twice.

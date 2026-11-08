@@ -1,4 +1,4 @@
--- The `n` and `N` keys: they ask for an agent and a directory with `vim.ui`
+-- The `a` and `A` keys: they ask for an agent and a directory with `vim.ui`
 -- and start a new Agent block through the Backend. The prompts come from the
 -- harness, which waits for the test to answer them, and the Backend holds
 -- every create, so the test decides when a result arrives.
@@ -203,13 +203,13 @@ describe('ui.dashboard create', function()
         h.prompt.answer_input(text)
     end
 
-    describe('n', function()
+    describe('a', function()
         it('asks for an agent and the directory of the row', function()
             local object = holding_backend(ONE)
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on_block('block:b1')
 
-            h:press('n')
+            h:press('a')
 
             assert.are.same(
                 config.get().agents.commands,
@@ -239,7 +239,7 @@ describe('ui.dashboard create', function()
             local object = holding_backend(ONE)
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on_block('block:b1')
-            h:press('n')
+            h:press('a')
             answer_prompts('pi', dir)
             assert.are.equal(1, object.snapshots)
 
@@ -264,7 +264,7 @@ describe('ui.dashboard create', function()
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on_block('block:b2')
 
-            h:press('n')
+            h:press('a')
             h.prompt.answer_select('pi')
 
             assert.are.equal(vim.uv.cwd(), h.prompt.calls[2].default)
@@ -275,7 +275,7 @@ describe('ui.dashboard create', function()
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on(1)
 
-            h:press('n')
+            h:press('a')
             h.prompt.answer_select('pi')
 
             assert.are.equal(vim.uv.cwd(), h.prompt.calls[2].default)
@@ -286,14 +286,14 @@ describe('ui.dashboard create', function()
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on(1)
 
-            h:press('n')
+            h:press('a')
 
             assert.are.same({}, h.prompt.calls)
             assert.are.same({}, object.creates)
             assert.are.equal(1, #h.notify.calls)
             assert.are.equal(
                 'rexai: the Home session has no Agent block to add a '
-                    .. 'Window next to; use N',
+                    .. 'Window next to; use A',
                 h.notify.calls[1].message
             )
             assert.are.equal(vim.log.levels.INFO, h.notify.calls[1].level)
@@ -307,7 +307,7 @@ describe('ui.dashboard create', function()
                 put_cursor_on(3)
                 assert.are.equal('', h:lines()[3])
 
-                h:press('n')
+                h:press('a')
 
                 assert.are.same({}, h.prompt.calls)
                 assert.are.same({}, object.creates)
@@ -324,7 +324,7 @@ describe('ui.dashboard create', function()
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on_block('block:b1')
 
-            h:press('n')
+            h:press('a')
             answer_prompts('pi', dir .. '/missing')
 
             assert.are.same({}, object.creates)
@@ -340,8 +340,8 @@ describe('ui.dashboard create', function()
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on_block('block:b1')
 
-            h:press('n')
-            h:press('n')
+            h:press('a')
+            h:press('a')
             -- The older prompt answers first and drops its request.
             h.prompt.answer_select('pi')
             assert.are.equal(0, #object.creates)
@@ -357,9 +357,9 @@ describe('ui.dashboard create', function()
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on_block('block:b1')
 
-            h:press('n')
+            h:press('a')
             h.prompt.answer_select('pi')
-            h:press('n')
+            h:press('a')
             h.prompt.answer_input(dir)
 
             assert.are.same({}, object.creates)
@@ -375,11 +375,11 @@ describe('ui.dashboard create', function()
             local object = holding_backend(ONE)
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on_block('block:b1')
-            h:press('n')
+            h:press('a')
             answer_prompts('pi', dir)
             -- The create of the first press is still waiting when the second
             -- press starts.
-            h:press('n')
+            h:press('a')
 
             object.answer(nil)
 
@@ -392,12 +392,12 @@ describe('ui.dashboard create', function()
             local object = holding_backend(ONE)
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on_block('block:b1')
-            h:press('n')
+            h:press('a')
             answer_prompts('pi', dir)
             object.answer(nil)
             -- The focus of the first press is still waiting when the second
             -- press starts.
-            h:press('n')
+            h:press('a')
 
             object.answer_focus('cannot select the Window')
 
@@ -407,14 +407,14 @@ describe('ui.dashboard create', function()
         end)
     end)
 
-    describe('N', function()
+    describe('A', function()
         it('starts a Session named after the directory', function()
             local object = holding_backend(TWO)
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on(3)
             assert.is_nil(dashboard.current_target())
 
-            h:press('N')
+            h:press('A')
             h.prompt.answer_select('pi')
             assert.are.equal(vim.uv.cwd(), h.prompt.calls[2].default)
             h.prompt.answer_input(dir)
@@ -434,7 +434,7 @@ describe('ui.dashboard create', function()
         it('selects the new Session and draws it', function()
             local object = holding_backend(ONE)
             h:open({ backend = object, home_session_id = HOME })
-            h:press('N')
+            h:press('A')
             answer_prompts('pi', dir)
 
             object.answer(nil)
@@ -450,7 +450,7 @@ describe('ui.dashboard create', function()
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on(1)
 
-            h:press('N')
+            h:press('A')
             answer_prompts('pi', dir)
 
             assert.are.equal(1, #object.creates)
@@ -466,7 +466,7 @@ describe('ui.dashboard create', function()
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on(1)
 
-            h:press('N')
+            h:press('A')
             answer_prompts('pi', dir)
 
             assert.are.equal(1, #object.creates)
@@ -478,7 +478,7 @@ describe('ui.dashboard create', function()
             config.setup({ focus_new = false })
             local object = holding_backend(ONE)
             h:open({ backend = object, home_session_id = HOME })
-            h:press('N')
+            h:press('A')
             answer_prompts('pi', dir)
 
             object.answer(nil)
@@ -497,8 +497,8 @@ describe('ui.dashboard create', function()
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on_block('block:b1')
 
-            h:press('n')
-            h:press('N')
+            h:press('a')
+            h:press('A')
 
             assert.are.same({}, h.prompt.calls)
             assert.are.same({}, object.creates)
@@ -521,7 +521,7 @@ describe('ui.dashboard create', function()
                 local object = holding_backend(ONE)
                 h:open({ backend = object, home_session_id = HOME })
                 put_cursor_on_block('block:b1')
-                h:press('n')
+                h:press('a')
 
                 wipe()
                 h.prompt.answer_select('pi')
@@ -539,7 +539,7 @@ describe('ui.dashboard create', function()
                 local object = holding_backend(ONE)
                 h:open({ backend = object, home_session_id = HOME })
                 put_cursor_on_block('block:b1')
-                h:press('n')
+                h:press('a')
                 h.prompt.answer_select('pi')
 
                 wipe()
@@ -554,7 +554,7 @@ describe('ui.dashboard create', function()
             local object = holding_backend(ONE)
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on_block('block:b1')
-            h:press('n')
+            h:press('a')
             answer_prompts('pi', dir)
             assert.are.equal(1, #object.creates)
 
@@ -569,7 +569,7 @@ describe('ui.dashboard create', function()
             local object = holding_backend(ONE)
             h:open({ backend = object, home_session_id = HOME })
             put_cursor_on_block('block:b1')
-            h:press('n')
+            h:press('a')
             answer_prompts('pi', dir)
 
             local replacement = holding_backend(ONE)

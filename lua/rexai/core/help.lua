@@ -1,4 +1,4 @@
--- The text of the `?` float: one line per Dashboard key, the key first and
+-- The text of the `g?` float: one line per Dashboard key, the key first and
 -- what it does after it, in a column of its own.
 
 local M = {}

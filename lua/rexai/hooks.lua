@@ -1,6 +1,6 @@
 -- The three user hooks of the Dashboard. `resolve_path` decides which
 -- directory an Agent row stands for; `review` receives the context of the row
--- the `d` key is on; `session_name` names a new Session. All are plain
+-- the `o` key is on; `session_name` names a new Session. All are plain
 -- functions in the config, read at call time, so a `setup()` after the
 -- Dashboard opened counts.
 

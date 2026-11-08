@@ -29,7 +29,7 @@ local M = {}
 ---@field glyphs rexai.Glyphs the glyph of every Agent status
 ---@field agents rexai.Agents what makes a Block an Agent block
 ---@field resolve_path (fun(block: rexai.Row): string|nil)|nil the directory of a row
----@field review (fun(ctx: table))|nil what the `d` key calls
+---@field review (fun(ctx: table))|nil what the `o` key calls
 
 ---@type rexai.Config
 M.defaults = {
@@ -39,7 +39,7 @@ M.defaults = {
     title_width = 40,
     rex_bin = 'rex',
     peek_lines = 20,
-    -- `n` and `N` make the new Window the current one; false leaves the view
+    -- `a` and `A` make the new Window the current one; false leaves the view
     -- alone.
     focus_new = true,
     -- `session_name = function(path) return 'a label' end` names a new

@@ -61,15 +61,17 @@ Keys in the Dashboard:
 
 | Key | Action |
 | --- | --- |
-| `q` | Close the Dashboard. Shows the buffer that was in the window before. |
 | `<CR>` | Go to the Agent block under the cursor, or to the Session of a header. |
-| `r` | Ask Rex for a snapshot now. |
-| `e` | Show or hide the Exited rows. The Dashboard keeps the choice until its buffer is wiped. |
-| `d` | Hand the row under the cursor to the `review` hook. |
 | `K` | Open a float with what is known about the Agent block and the last lines of its screen. Press `K` again to enter the float. |
-| `n` | Add a Window to the Session under the cursor. |
-| `N` | Start a Session for a directory you name. |
-| `?` | Open a float with one line per Dashboard key. Replaces Vim's backward search here. Closes when the cursor moves. |
+| `o` | Hand the row under the cursor to the `review` hook. |
+| `r` | Ask Rex for a snapshot now. |
+| `x` | Show or hide the Exited rows. The Dashboard keeps the choice until its buffer is wiped. |
+| `a` | Add a Window to the Session under the cursor. |
+| `A` | Start a Session for a directory you name. |
+| `q` | Close the Dashboard. Shows the buffer that was in the window before. |
+| `g?` | Open a float with one line per Dashboard key. Closes when the cursor moves. |
+
+The Dashboard maps only keys that edit text, which a read-only buffer never needs. Vim keeps its own meaning for `d`, `e`, `n`, `N` and `?`.
 
 While a window shows the Dashboard and Neovim has focus, it asks Rex every `refresh_ms`. It also asks when it opens, on `r`, and when Neovim gains focus. When Rex cannot be read, the Dashboard shows `Rex unreadable:` with the reason and retries after 5 seconds.
 
@@ -81,17 +83,17 @@ Every option is flat. A list replaces the default list; it does not add to it. A
 | --- | --- | --- | --- |
 | `refresh_ms` | integer | `1000` | How often the Dashboard asks Rex for a snapshot. |
 | `git_refresh_ms` | integer | `5000` | How old a git result may be before it is asked again. |
-| `show_exited` | boolean | `true` | The starting value of the `e` toggle: whether Exited rows are listed. |
+| `show_exited` | boolean | `true` | The starting value of the `x` toggle: whether Exited rows are listed. |
 | `title_width` | integer | `40` | The widest title, in display cells, `…` included. |
 | `rex_bin` | string | `'rex'` | The `rex` executable the Dashboard and `:checkhealth` run. |
 | `peek_lines` | integer | `20` | How many lines from the end of a Block the `K` float keeps. |
-| `focus_new` | boolean | `true` | Whether `n` and `N` select the Window or Session they made. `false` leaves the view where it is. |
+| `focus_new` | boolean | `true` | Whether `a` and `A` select the Window or Session they made. `false` leaves the view where it is. |
 | `session_name` | function or nil | `nil` | Names a new Session from its directory. See [Recipes](#recipes). |
 | `glyphs` | table | see below | One single-width character per Agent status. |
 | `resolve_path` | function or nil | `nil` | Gives the directory a row stands for. See [Recipes](#recipes). |
-| `review` | function or nil | `nil` | What `d` calls with the context of a row. See [Recipes](#recipes). |
+| `review` | function or nil | `nil` | What `o` calls with the context of a row. See [Recipes](#recipes). |
 | `agents.apps` | list | `{ 'claude-code', 'pi' }` | `app` names in Rex program status records that make a Block an Agent block. |
-| `agents.commands` | list | `{ 'claude', 'codex', 'opencode', 'pi' }` | Foreground command names that make a Block an Agent block, and the agents `n` and `N` offer. An empty list makes both refuse. |
+| `agents.commands` | list | `{ 'claude', 'codex', 'opencode', 'pi' }` | Foreground command names that make a Block an Agent block, and the agents `a` and `A` offer. An empty list makes both refuse. |
 | `agents.launch` | table | `{}` | Maps an agent name to the full argv that starts it. |
 
 The full `setup()` call with every default:
@@ -124,7 +126,7 @@ require('rexai').setup({
     },
     -- nil: a row stands for the directory of its Block.
     resolve_path = nil,
-    -- nil: `d` only says that no review function is set.
+    -- nil: `o` only says that no review function is set.
     review = nil,
 })
 ```
@@ -148,11 +150,11 @@ require('rexai').setup({
 })
 ```
 
-The git slot, `d` and `n` all use the directory it returns.
+The git slot, `o` and `a` all use the directory it returns.
 
 ### `review`
 
-`d` calls `review` with the context of the row under the cursor. `ctx.path` is always set, because `d` does not call the hook for a row with no directory.
+`o` calls `review` with the context of the row under the cursor. `ctx.path` is always set, because `o` does not call the hook for a row with no directory.
 
 ```lua
 require('rexai').setup({
@@ -167,11 +169,11 @@ require('rexai').setup({
 })
 ```
 
-If the hook throws, the Dashboard warns with the error. Without a hook, `d` says `rexai: no review function is set; add review = function(ctx) ... end to setup()`.
+If the hook throws, the Dashboard warns with the error. Without a hook, `o` says `rexai: no review function is set; add review = function(ctx) ... end to setup()`.
 
 ### `session_name`
 
-`N` asks for a directory, then calls `session_name` with that absolute path, with `~` already expanded and no trailing slash. The label it returns names the new Session, and `N` looks for a Session with that label before it creates one: if one exists, `N` adds a Window to it.
+`A` asks for a directory, then calls `session_name` with that absolute path, with `~` already expanded and no trailing slash. The label it returns names the new Session, and `A` looks for a Session with that label before it creates one: if one exists, `A` adds a Window to it.
 
 ```lua
 require('rexai').setup({
@@ -199,9 +201,9 @@ require('rexai').setup({
 
 ## Starting Agent blocks
 
-`n` asks for an agent from `agents.commands`, then for a directory that starts at the row's directory, or at Neovim's on a Session header. It adds a Window to the Session under the cursor. On the header of the Home session it refuses, because a Window is added next to an Agent block, and the Home session may have none. Use `N` there.
+`a` asks for an agent from `agents.commands`, then for a directory that starts at the row's directory, or at Neovim's on a Session header. It adds a Window to the Session under the cursor. On the header of the Home session it refuses, because a Window is added next to an Agent block, and the Home session may have none. Use `A` there.
 
-`N` asks for an agent, then for a directory that starts at Neovim's current directory. It starts a Session labelled by `session_name`, or adds a Window to the Session that already has that label.
+`A` asks for an agent, then for a directory that starts at Neovim's current directory. It starts a Session labelled by `session_name`, or adds a Window to the Session that already has that label.
 
 When `agents.commands` is empty, both keys warn `rexai: no agent is configured; set agents.commands in setup()` and open no picker.
 

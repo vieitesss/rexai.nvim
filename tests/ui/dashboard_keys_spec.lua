@@ -1,5 +1,5 @@
 -- The Dashboard keys: `<CR>` takes the user to the Agent block or Session
--- under the cursor, `r` asks Rex at once and `e` shows or hides the Exited
+-- under the cursor, `r` asks Rex at once and `x` shows or hides the Exited
 -- rows. The fake Backend serves invented snapshots and the tests fire the
 -- poller's timer by hand.
 
@@ -228,7 +228,7 @@ describe('ui.dashboard keys', function()
         end)
     end)
 
-    describe('e', function()
+    describe('x', function()
         -- The first Block ends while the second stays live.
         ---@param ids table `first` and `second` Block ids
         ---@return table, table first and second snapshots
@@ -264,12 +264,12 @@ describe('ui.dashboard keys', function()
                 assert.are.equal(3, #h:lines())
                 assert.are.equal(2, support.count(calls, 'snapshot'))
 
-                h:press('e')
+                h:press('x')
 
                 assert.are.equal(2, #h:lines())
                 assert.are.equal(2, support.count(calls, 'snapshot'))
 
-                h:press('e')
+                h:press('x')
 
                 assert.are.equal(3, #h:lines())
                 assert.are.equal(2, support.count(calls, 'snapshot'))
@@ -344,7 +344,7 @@ describe('ui.dashboard keys', function()
             vim.api.nvim_win_set_cursor(win, { 6, 0 })
             assert.are.equal('block:e2', dashboard.current_target(win).block_id)
 
-            h:press('e')
+            h:press('x')
 
             assert.are.equal(5, vim.api.nvim_win_get_cursor(win)[1])
             assert.are.equal('block:e2', dashboard.current_target(win).block_id)
@@ -361,7 +361,7 @@ describe('ui.dashboard keys', function()
             -- live Block show.
             assert.are.equal(2, #h:lines())
 
-            h:press('e')
+            h:press('x')
 
             assert.are.equal(3, #h:lines())
             -- The key is Dashboard state: the config keeps its value.
@@ -369,7 +369,7 @@ describe('ui.dashboard keys', function()
         end)
     end)
 
-    describe('?', function()
+    describe('g?', function()
         -- A Backend that answers `snapshot` at once and holds every `peek`
         -- until the test answers it, so the test decides when a result
         -- arrives.
@@ -419,7 +419,7 @@ describe('ui.dashboard keys', function()
             h:open({ snapshots = { TWO } })
             local buf = assert(h:buf())
 
-            h:press('?')
+            h:press('g?')
 
             local lines = assert(h:float_lines())
             local maps = vim.api.nvim_buf_get_keymap(buf, 'n')
@@ -441,7 +441,7 @@ describe('ui.dashboard keys', function()
 
         it('closes when the cursor moves', function()
             h:open({ snapshots = { TWO } })
-            h:press('?')
+            h:press('g?')
             assert.is_not_nil(h:float())
 
             -- A headless Neovim fires no CursorMoved for a keystroke.
@@ -462,10 +462,28 @@ describe('ui.dashboard keys', function()
             local win = vim.api.nvim_get_current_win()
             local before = vim.api.nvim_win_get_cursor(win)
 
-            h:press('?')
+            h:press('g?')
 
             assert.are.equal(win, vim.api.nvim_get_current_win())
             assert.are.same(before, vim.api.nvim_win_get_cursor(win))
+        end)
+
+        it('lists the keys in the order of the layout', function()
+            h:open({ snapshots = { TWO } })
+
+            h:press('g?')
+
+            assert.are.same({
+                '<CR>  Go to the Agent block or Session',
+                'K     Peek at the Agent block',
+                'o     Review the Agent block',
+                'r     Refresh the Dashboard',
+                'x     Toggle the Exited rows',
+                'a     Add a Window to the Session',
+                'A     Start a Session',
+                'q     Close the Dashboard',
+                'g?    Show these keys',
+            }, assert(h:float_lines()))
         end)
 
         it('lets K show the Agent block again', function()
@@ -480,7 +498,7 @@ describe('ui.dashboard keys', function()
             h:press('K')
             assert.is_not_nil(float_text():find('the build is green', 1, true))
 
-            h:press('?')
+            h:press('g?')
             assert.is_not_nil(float_text():find('Close the Dashboard', 1, true))
 
             h:press('K')
@@ -500,7 +518,7 @@ describe('ui.dashboard keys', function()
             })
             h:press('K')
 
-            h:press('?')
+            h:press('g?')
             assert.is_not_nil(float_text():find('Close the Dashboard', 1, true))
 
             held.answer('the build is green')
@@ -512,33 +530,57 @@ describe('ui.dashboard keys', function()
     end)
 
     describe('the keymaps', function()
+        -- The keys of the Dashboard, and what each one does.
+        local WANTED = {
+            ['<CR>'] = 'Go to the Agent block or Session',
+            K = 'Peek at the Agent block',
+            o = 'Review the Agent block',
+            r = 'Refresh the Dashboard',
+            x = 'Toggle the Exited rows',
+            a = 'Add a Window to the Session',
+            A = 'Start a Session',
+            q = 'Close the Dashboard',
+            ['g?'] = 'Show these keys',
+        }
+
         it(
             'are only in the Dashboard buffer, with a desc and nowait',
             function()
                 h:open({ snapshots = { TWO } })
 
-                local wanted = {
-                    q = 'Close the Dashboard',
-                    ['<CR>'] = 'Go to the Agent block or Session',
-                    r = 'Refresh the Dashboard',
-                    e = 'Toggle the Exited rows',
-                    d = 'Review the Agent block',
-                    K = 'Peek at the Agent block',
-                    n = 'Add a Window to the Session',
-                    N = 'Start a Session',
-                    ['?'] = 'Show these keys',
-                }
-                for lhs, desc in pairs(wanted) do
+                for lhs, desc in pairs(WANTED) do
                     local map = vim.fn.maparg(lhs, 'n', false, true)
                     assert.are.equal(desc, map.desc)
                     assert.are.equal(1, map.nowait)
                 end
 
                 vim.api.nvim_win_set_buf(0, h.scratch)
-                for lhs in pairs(wanted) do
+                for lhs in pairs(WANTED) do
                     assert.are.equal('', vim.fn.maparg(lhs, 'n'))
                 end
             end
         )
+
+        it('leaves Vim its own d, e, n, N and ?', function()
+            h:open({ snapshots = { TWO } })
+
+            for _, lhs in ipairs({ 'd', 'e', 'n', 'N', '?' }) do
+                assert.are.same({}, vim.fn.maparg(lhs, 'n', false, true))
+            end
+        end)
+
+        it('leaves the other g commands to Vim', function()
+            h:open({ snapshots = { TWO } })
+            local win = vim.api.nvim_get_current_win()
+            vim.api.nvim_win_set_cursor(win, { #h:lines(), 0 })
+
+            h:press('gg')
+
+            assert.are.equal(1, vim.api.nvim_win_get_cursor(win)[1])
+
+            h:press('gj')
+
+            assert.are.equal(2, vim.api.nvim_win_get_cursor(win)[1])
+        end)
     end)
 end)

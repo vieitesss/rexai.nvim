@@ -5,7 +5,7 @@
 -- cursor when the Agent block or Session under it takes another line.
 --
 -- Only the window mechanics live here. The `K` key shows the lines `core.peek`
--- builds, and `ui.actions` decides when; the `?` key shows the lines
+-- builds, and `ui.actions` decides when; the `g?` key shows the lines
 -- `core.help` builds, and `ui.dashboard` decides when.
 
 local M = {}

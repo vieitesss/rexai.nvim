@@ -1,4 +1,4 @@
--- The text of the `?` float: one line per key. Every key here is invented.
+-- The text of the `g?` float: one line per key. Every key here is invented.
 
 local help = require('rexai.core.help')
 
