@@ -1,0 +1,73 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: rhysd/action-setup-vim@febef33995d6649302e9d88dda81e071b68f16a7 # v1.6.1
+        with:
+          version: stable
+          neovim: true
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: 1.59.0
+      - name: Install stylua 2.6.0
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}"
+          curl -fsSL -o stylua.zip \
+            "https://github.com/JohnnyMorganz/StyLua/releases/download/v2.6.0/stylua-linux-x86_64.zip"
+          echo "a485f72bbfa22e4642e77a84b5edc2611a5cab7477b34e2e709dd8f78e919895  stylua.zip" | sha256sum -c -
+          unzip -q stylua.zip -d stylua
+          echo "${RUNNER_TEMP}/stylua" >> "${GITHUB_PATH}"
+      - name: Install lua-language-server 3.19.2
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}"
+          curl -fsSL -o luals.tar.gz \
+            "https://github.com/LuaLS/lua-language-server/releases/download/3.19.2/lua-language-server-3.19.2-linux-x64.tar.gz"
+          echo "93ad326b10f6c00911dd8c450fa098332dbd8f9f45d1052f5636a2d54479b947  luals.tar.gz" | sha256sum -c -
+          mkdir -p luals
+          tar xzf luals.tar.gz -C luals
+          echo "${RUNNER_TEMP}/luals/bin" >> "${GITHUB_PATH}"
+      - run: just check
+
+  test:
+    name: Test (${{ matrix.os }}, ${{ matrix.nvim }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            nvim: v0.11.7
+          - os: ubuntu-latest
+            nvim: v0.12.6
+          - os: ubuntu-latest
+            nvim: stable
+          - os: macos-latest
+            nvim: stable
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: rhysd/action-setup-vim@febef33995d6649302e9d88dda81e071b68f16a7 # v1.6.1
+        with:
+          version: ${{ matrix.nvim }}
+          neovim: true
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: 1.59.0
+      - run: just test
