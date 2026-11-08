@@ -184,7 +184,7 @@ When the hook returns `nil` or `''`, the label is the last two directories joine
 
 ### `agents.launch`
 
-`launch` maps a name from `agents.commands` to the full argv that starts that agent. Rex runs the argv directly, without a shell. A value that is not a list of strings is ignored, and the bare name starts the agent.
+`launch` maps a name from `agents.commands` to the full argv that starts that agent. Each element is one argument; no shell parses the list, and Rex starts it with the login shell's environment. A value that is not a list of strings is ignored, and the bare name starts the agent.
 
 ```lua
 require('rexai').setup({
