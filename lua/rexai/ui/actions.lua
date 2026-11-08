@@ -49,8 +49,6 @@ function M.new(opts)
     -- How many `n` and `N` presses there were: only the newest press creates,
     -- so a second press while the first prompt is open never creates twice.
     local adds = 0
-    -- A broken `session_name` hook is worth one warning per Dashboard.
-    local named = false
 
     local object = {}
 
@@ -223,27 +221,16 @@ function M.new(opts)
         return stat ~= nil and stat.type == 'directory'
     end
 
-    -- The label of a new Session in `path`: what the `session_name` hook says,
-    -- or the two last directories. A broken hook warns once per Dashboard and
-    -- falls back to that rule.
+    -- The label of a new Session in `path`: what the hooks object gives for
+    -- it, or the two last directories.
     ---@param path string
     ---@return string
     local function session_label(path)
-        local hook = config.get().session_name
-        local custom
-        if type(hook) == 'function' then
-            local ok, value = pcall(hook, path)
-            if ok then
-                custom = value
-            elseif not named then
-                named = true
-                notify(
-                    'session_name failed: ' .. tostring(value),
-                    vim.log.levels.WARN
-                )
-            end
-        end
-        return core_launch.session_label(path, vim.uv.os_homedir(), custom)
+        return core_launch.session_label(
+            path,
+            vim.uv.os_homedir(),
+            hooks:session_name(path)
+        )
     end
 
     -- Asks for an agent and a directory and hands both to `create` with the
