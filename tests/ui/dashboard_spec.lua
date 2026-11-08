@@ -198,6 +198,29 @@ describe('ui.dashboard', function()
             assert.are.equal(dashboard.NAME, vim.api.nvim_buf_get_name(0))
         end)
 
+        it('returns each window to the buffer it had before', function()
+            local first_win = vim.api.nvim_get_current_win()
+            h:open({ snapshots = { UNTIMED } })
+
+            -- A second window shows the Dashboard over another buffer.
+            vim.cmd('vsplit')
+            local second_win = vim.api.nvim_get_current_win()
+            local other = vim.api.nvim_create_buf(true, false)
+            vim.api.nvim_win_set_buf(second_win, other)
+            h:open({ snapshots = { UNTIMED } })
+            assert.are.equal(h:buf(), vim.api.nvim_win_get_buf(first_win))
+            assert.are.equal(h:buf(), vim.api.nvim_win_get_buf(second_win))
+
+            h:press('q')
+            assert.are.equal(other, vim.api.nvim_win_get_buf(second_win))
+
+            vim.api.nvim_set_current_win(first_win)
+            h:press('q')
+            assert.are.equal(h.scratch, vim.api.nvim_win_get_buf(first_win))
+
+            vim.api.nvim_buf_delete(other, { force = true })
+        end)
+
         it('starts an empty buffer in a window with nothing else', function()
             h:command({ snapshots = { UNTIMED } })
             vim.api.nvim_buf_delete(h.scratch, { force = true })
@@ -255,7 +278,8 @@ describe('ui.dashboard', function()
 
             h:press('q')
 
-            assert.are.equal(2, #vim.api.nvim_tabpage_list_wins(0))
+            -- The split was never over another buffer, so it closes.
+            assert.are.equal(1, #vim.api.nvim_tabpage_list_wins(0))
             assert.are.equal(1, h.timer.count())
             h.timer.fire()
             assert.is_true(support.count(calls, 'snapshot') > 1)
