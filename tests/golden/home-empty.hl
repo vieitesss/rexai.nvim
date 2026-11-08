@@ -1,7 +1,7 @@
 1:0-1 RexaiIdle
 1:2-7 RexaiHeader
 2:2-3 RexaiIdle
-2:9-22 RexaiDim
-2:24-28 RexaiIdle
+2:4-8 RexaiIdle
+2:10-23 RexaiDim
 4:2-14 RexaiHeader
 4:15-21 RexaiDim

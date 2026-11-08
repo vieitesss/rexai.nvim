@@ -1,19 +1,19 @@
 + session-1
-  + claude-code 0001  title-1  done    1d
+  + done     title-1  claude-code 0001  1d
 
 + session-2
-  + claude-code 0002  title-1  done    1d
-  + claude-code 0004  title-3  done    20h
+  + done     title-1  claude-code 0002  1d
+  + done     title-3  claude-code 0004  20h
 
 + session-4
-  + claude-code 0007  title-6  done    1h
-  * window-1          title-7  working 1h
+  + done     title-6  claude-code 0007  1h
+  * working  title-7  window-1          1h
 
 + session-6
-  + claude-code 0010  title-9  done    1h
+  + done     title-9  claude-code 0010  1h
 
 * session-5
-  * claude-code 0009  title-8  working 1h
+  * working  title-8  claude-code 0009  1h
 
 - session-3
-  - claude-code 0006  title-5  idle    2d
+  - idle     title-5  claude-code 0006  2d

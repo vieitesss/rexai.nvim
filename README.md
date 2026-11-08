@@ -34,15 +34,15 @@ Run `:Rexai`. The Dashboard is a buffer in the current window, and `q` gives tha
 
 ```
 ! api
-  ! claude-code 4d5e  add the migration      needs input 1m
-  x pi 7a8b           fix the failing test   error       4m
-  + claude-code 0b1c  write the parser docs  done        14m
-  ? opencode 6b7c     look at the logs       unreported
-  - pi 9e0f           waiting for review     idle        2h
-  . pi 2b3c           port the old script    exited 1    9m
+  ! needs input  add the migration      claude-code 4d5e  1m
+  x error        fix the failing test   pi 7a8b           4m
+  + done         write the parser docs  claude-code 0b1c  14m
+  ? unreported   look at the logs       opencode 6b7c
+  - idle         waiting for review     pi 9e0f           2h
+  . exited 1     port the old script    pi 2b3c           9m
 
 * my-project (home)
-  * pi 1b2c           refactor the parser    working     45s
+  * working      refactor the parser    pi 1b2c           45s
 ```
 
 The sample is a real render of invented names. A Session header shows the highest Agent status among its rows. When git works in a row's directory, a git column shows `repo · branch ↑ahead ↓behind ●changed`, leaving out zero counts. A row with no git result leaves that column blank.

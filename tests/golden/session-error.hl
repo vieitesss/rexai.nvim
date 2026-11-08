@@ -1,7 +1,7 @@
 1:0-1 RexaiDone
 1:2-7 RexaiHeader
 2:2-3 RexaiDone
-2:9-21 RexaiDim
-2:23-27 RexaiDone
+2:4-8 RexaiDone
+2:10-22 RexaiDim
 4:2-8 RexaiHeader
 5:0-40 RexaiError

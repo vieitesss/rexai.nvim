@@ -461,10 +461,9 @@ describe('ui.render', function()
             local status_span = assert(row_status(out, 2))
             assert.are.equal('needs input', text_of(out, status_span))
             assert.are.equal('RexaiNeedsInput', status_span.group)
-            assert.are.equal(
-                'needs input 42s',
-                out.lines[2]:sub(status_span.col_start + 1)
-            )
+            -- The status comes right after the glyph, the age ends the row.
+            assert.are.equal(spans[1].col_end + 1, status_span.col_start)
+            assert.are.equal('pi 2c3d  42s', out.lines[2]:match('pi 2c3d.*$'))
         end)
 
         it('shows the exit code of an exited row', function()
@@ -493,8 +492,7 @@ describe('ui.render', function()
             local sessions = { session({ rows = { row({}) } }) }
             local out = build(sessions)
             assert.is_nil(out.lines[2]:find(' $'))
-            local span = assert(find(out, 'RexaiIdle', 'idle'))
-            assert.are.equal(#out.lines[2], span.col_end)
+            assert.is_truthy(out.lines[2]:find('pi 2c3d$'))
         end)
 
         it('shows now for a fresh status', function()
@@ -508,10 +506,7 @@ describe('ui.render', function()
                     },
                 }),
             }
-            assert.are.equal(
-                'done now',
-                build(sessions).lines[2]:match('%S+ %S+$')
-            )
+            assert.are.equal('now', build(sessions).lines[2]:match('%S+$'))
         end)
 
         it('sanitises a title', function()
@@ -615,13 +610,12 @@ describe('ui.render', function()
             local without = build(sessions)
             local with = build(sessions, { git = { ['block:a'] = 'main*' } })
 
-            local first = assert(find(with, 'RexaiDim', 'x'))
-            local second = assert(find(with, 'RexaiDim', 'y'))
-            assert.are.equal(first.col_start, second.col_start)
-            assert.is_true(
-                first.col_start
-                    > assert(find(without, 'RexaiDim', 'x')).col_start
-            )
+            -- The label follows the git column, so it starts at the same
+            -- place on both rows and further right than without git.
+            local first = with.lines[2]:find('pi 2c3d', 1, true)
+            local second = with.lines[3]:find('pi 2c3d', 1, true)
+            assert.are.equal(first, second)
+            assert.is_true(first > without.lines[2]:find('pi 2c3d', 1, true))
             assert.is_nil(with.lines[3]:find('main', 1, true))
             assert.is_truthy(with.lines[2]:find('main*', 1, true))
         end)

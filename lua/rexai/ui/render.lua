@@ -358,16 +358,18 @@ function M.build(sessions, opts)
             line:raw('  ')
             line:cell(o.glyphs[row.status] or '', glyph_width, group)
             line:raw(' ')
-            line:cell(cell.label, columns.label)
+            -- The most important column comes first: status, title, git,
+            -- label, then the age.
+            line:cell(cell.status, columns.status, group)
+            line:raw('  ')
+            line:cell(cell.title, columns.title, 'RexaiDim')
             line:raw('  ')
             if columns.git > 0 then
                 line:cell(cell.git, columns.git)
                 line:raw('  ')
             end
-            line:cell(cell.title, columns.title, 'RexaiDim')
+            line:cell(cell.label, columns.label)
             line:raw('  ')
-            line:cell(cell.status, columns.status, group)
-            line:raw(' ')
             line:text(cell.age)
 
             out.targets[push(line:line(), line.spans)] = {
