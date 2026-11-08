@@ -144,7 +144,7 @@ function M.check(opts)
         out.ok('Rex server is running' .. rex_version_text(whoami.rex_version))
     else
         out.error(
-            server_error,
+            server_error or 'Rex did not answer',
             'start the server with `rex server start`, or open the Rex app'
         )
     end
@@ -175,7 +175,10 @@ function M.check(opts)
     elseif not whoami then
         out.info('connected Rex apps not checked: the server did not answer')
     elseif not clients then
-        out.error(apps_error, 'the Dashboard cannot list what Rex has')
+        out.error(
+            apps_error or 'Rex did not answer',
+            'the Dashboard cannot list what Rex has'
+        )
     else
         local apps = connected_apps(clients)
         if #apps == 0 then
