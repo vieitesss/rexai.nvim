@@ -288,6 +288,8 @@ describe('backend.rex', function()
         it('needs a Session', function()
             local backend = rex.new({ bin = stub.bin })
             local got = result(function(callback)
+                -- The spec is deliberately empty: the test wants the error.
+                ---@diagnostic disable-next-line: missing-fields
                 backend.create_window({}, callback)
             end)
 

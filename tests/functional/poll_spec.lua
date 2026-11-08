@@ -443,7 +443,7 @@ describe('poll', function()
             end,
         })
         local function complete(err, result)
-            local event = vim.uv.new_timer()
+            local event = assert(vim.uv.new_timer())
             event:start(0, 0, function()
                 event:close()
                 finish(err, result)
@@ -474,7 +474,7 @@ describe('poll', function()
             local backend, calls =
                 fake.new({ snapshots = { snapshot_with('block:b1') } })
             local poller = poll.new({ backend = backend, interval_ms = 20 })
-            local barrier = vim.uv.new_timer()
+            local barrier = assert(vim.uv.new_timer())
             local fired = false
 
             poller.start()

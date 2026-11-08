@@ -390,9 +390,8 @@ local function check(path, text)
         return
     end
 
-    local file = io.open(path, 'r')
-    assert.is_not_nil(
-        file,
+    local file = assert(
+        io.open(path, 'r'),
         path .. ' is missing: run the spec with REXAI_UPDATE_GOLDEN=1'
     )
     local expected = file:read('*a')

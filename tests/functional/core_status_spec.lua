@@ -37,6 +37,7 @@ describe('core.status', function()
             local state, expected = case[1], case[2]
             it('maps ' .. state .. ' to ' .. expected, function()
                 local result = status.from_record({ state = state })
+                ---@cast result rexai.Status
                 assert.are.equal(expected, result.name)
             end)
         end
@@ -54,12 +55,14 @@ describe('core.status', function()
                 state = 'blocked',
                 kind = 'permission',
             })
+            ---@cast blocked rexai.Status
             assert.are.equal('permission', blocked.kind)
 
             local working = status.from_record({
                 state = 'working',
                 kind = 'permission',
             })
+            ---@cast working rexai.Status
             assert.is_nil(working.kind)
         end)
 
@@ -69,6 +72,7 @@ describe('core.status', function()
                 msg = 'finished',
                 updated_at = '2026-01-01T10:00:00+00:00',
             })
+            ---@cast result rexai.Status
             assert.are.equal('finished', result.msg)
             assert.are.equal('2026-01-01T10:00:00+00:00', result.updated_at)
         end)

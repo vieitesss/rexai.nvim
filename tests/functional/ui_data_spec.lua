@@ -189,7 +189,14 @@ describe('ui.data', function()
     describe('context', function()
         it('gives the row, its Session, its path and its git info', function()
             git = stub_git({
-                ['/work/vendored'] = { root = '/work', branch = 'main' },
+                ['/work/vendored'] = {
+                    root = '/work',
+                    branch = 'main',
+                    detached = false,
+                    ahead = 0,
+                    behind = 0,
+                    changed = 0,
+                },
             })
             local d = object()
             d:accept(SNAPSHOT, nil)

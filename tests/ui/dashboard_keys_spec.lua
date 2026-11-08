@@ -231,7 +231,7 @@ describe('ui.dashboard keys', function()
     describe('e', function()
         -- The first Block ends while the second stays live.
         ---@param ids table `first` and `second` Block ids
-        ---@return table first, second snapshots
+        ---@return table, table first and second snapshots
         local function ending(ids)
             local live = with_first(
                 snap.block({

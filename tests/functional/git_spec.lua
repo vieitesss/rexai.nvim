@@ -105,6 +105,7 @@ describe('git', function()
             root.callback(nil, '/work/orbit\n')
 
             local info = g:get('/work/orbit')
+            ---@cast info rexai.GitInfo
             assert.are.equal('orbit', info.repo)
             assert.are.equal('/work/orbit', info.root)
             assert.are.equal('main', info.branch)
@@ -350,6 +351,9 @@ describe('git', function()
 
         it('describes a throwaway work tree', function()
             if vim.fn.executable('git') ~= 1 then
+                -- A lone message marks the running test pending; the meta of
+                -- busted asks for a block as well.
+                ---@diagnostic disable-next-line: missing-parameter
                 pending('git is not on PATH')
                 return
             end
@@ -394,7 +398,7 @@ describe('git', function()
 
                 assert.are.equal(
                     'orbit · feature/parser ●2',
-                    core_git.format(g:get(repo))
+                    core_git.format(g:get(repo) --[[@as rexai.GitInfo]])
                 )
             end)
 

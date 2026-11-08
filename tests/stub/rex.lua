@@ -47,7 +47,7 @@ end
 
 write('calls.jsonl', vim.json.encode(argv) .. '\n', 'a')
 
-local state = vim.json.decode(read('state.json'))
+local state = vim.json.decode(assert(read('state.json')))
 
 if state.delay_ms then
     -- Not `uv.sleep`: Neovim acts on SIGTERM only while its loop runs.

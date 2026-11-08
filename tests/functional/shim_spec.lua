@@ -159,7 +159,10 @@ describe('bin/rexai', function()
             },
             { 'do', root .. '/scripts/focus.lua', '--args', '-', '--json' },
         }, calls(dir))
-        assert.are.equal(HOME_JSON, vim.trim(read(dir .. '/focus_stdin')))
+        assert.are.equal(
+            HOME_JSON,
+            vim.trim(assert(read(dir .. '/focus_stdin')))
+        )
     end)
 
     it('passes the label of --name to home.lua', function()

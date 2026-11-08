@@ -29,8 +29,16 @@ describe('core.model', function()
     describe('new_memory', function()
         it('starts empty and is not shared', function()
             local first, second = model.new_memory(), model.new_memory()
-            first.blocks['block:x'] = {}
-            assert.is_nil(second.blocks['block:x'])
+            local row = {
+                session_id = 'session:x',
+                window_id = 'window:x',
+                block_id = 'block:x',
+                harness = 'pi',
+                label = 'orbit',
+                status = 'idle',
+            }
+            first.blocks[row.block_id] = row
+            assert.is_nil(second.blocks[row.block_id])
         end)
     end)
 

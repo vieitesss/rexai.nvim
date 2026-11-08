@@ -65,7 +65,7 @@ local function matching(calls, level, pattern)
             return call
         end
     end
-    assert.fail('no ' .. level .. ' message matching ' .. pattern)
+    return assert.fail('no ' .. level .. ' message matching ' .. pattern)
 end
 
 local function write_executable(dir, name)

@@ -263,7 +263,14 @@ describe('ui.actions', function()
 
         local hooks = hooks_mod.new({ notify = told.notify })
         local git = stub_git({
-            ['/work/orbit'] = { root = '/work/orbit', branch = 'main' },
+            ['/work/orbit'] = {
+                root = '/work/orbit',
+                branch = 'main',
+                detached = false,
+                ahead = 0,
+                behind = 0,
+                changed = 0,
+            },
         })
         local data = data_mod.new({ hooks = hooks, git = git })
         data:accept(SNAPSHOT, nil)
@@ -728,7 +735,7 @@ describe('ui.actions', function()
                 answer('Window', 'pi', '~')
 
                 assert.are.equal(
-                    vim.fs.normalize(vim.uv.os_homedir()),
+                    vim.fs.normalize(vim.uv.os_homedir() --[[@as string]]),
                     backend.windows[2].cwd
                 )
             end)

@@ -96,7 +96,7 @@ end
 
 ---@param out rexai.Render
 ---@param kind string
----@return string[] in line order
+---@return rexai.RenderTarget[] in line order
 local function targets_of(out, kind)
     local list = {}
     for line = 1, #out.lines do
@@ -214,7 +214,7 @@ describe('ui.render', function()
             assert.are.equal(#out.lines[1] - #'(home)', marker.col_start)
 
             -- No status, so the glyph slot is blank and carries no group.
-            assert.is_nil(find(out, highlights.group('idle')))
+            assert.is_nil(find(out, assert(highlights.group('idle'))))
         end)
 
         it(
