@@ -317,6 +317,41 @@ describe('home.lua', function()
         assert.are.same('block:b1', value.block_id)
     end)
 
+    it('reads the Block that runs Neovim when the Window holds more', function()
+        views['session:s1'].windows = {
+            window('window:w1', 'dashboard', {
+                { block_id = 'block:b1', label = 'Shell', flavor = BLOCK },
+                { block_id = 'block:b2', label = 'Dashboard', flavor = BLOCK },
+            }),
+        }
+        handlers['process'] = function(params)
+            local argv0 = params.block_id == 'block:b2' and 'nvim' or '-zsh'
+            return { foreground = { argv0 = argv0 } }
+        end
+
+        local ok, value = sandbox.run(script, rex)
+
+        assert.is_true(ok, value)
+        assert.are.same('block:b2', value.block_id)
+    end)
+
+    it('falls back to the first Block when none runs Neovim', function()
+        views['session:s1'].windows = {
+            window('window:w1', 'dashboard', {
+                { block_id = 'block:b1', label = 'First', flavor = BLOCK },
+                { block_id = 'block:b2', label = 'Second', flavor = BLOCK },
+            }),
+        }
+        handlers['process'] = function()
+            return { foreground = { argv0 = '-zsh' } }
+        end
+
+        local ok, value = sandbox.run(script, rex)
+
+        assert.is_true(ok, value)
+        assert.are.same('block:b1', value.block_id)
+    end)
+
     it('reads a name Rex typed as a number as a string', function()
         sessions = { { session_id = 'session:s2', label = '2' } }
         views['session:s2'] = {
