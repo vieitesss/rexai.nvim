@@ -238,7 +238,7 @@ The checks never start a server and never switch your view.
 
 ## Limits
 
-- Whether Rex clears the `done` Agent status after you view its Block is not verified. The plugin shows the status Rex reports and never changes it.
+- Rex clears the `done` Agent status once you view its Block. The plugin shows the status Rex reports and never changes it, so the row shows the new status on the next refresh.
 - The Dashboard knows only what Rex reports. An agent that reports nothing shows `unreported`. An agent that no `agents.apps` or `agents.commands` entry matches is not listed.
 - An Exited row appears only for an Agent block the Dashboard saw live in this Neovim process. Restarting Neovim forgets them. When Rex no longer lists a Block, its row goes too.
 - The plugin only reads and selects. It never closes a Block or a Session.
