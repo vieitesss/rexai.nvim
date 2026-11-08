@@ -13,7 +13,7 @@ local M = {}
 
 ---@class rexai.Hooks
 ---@field resolve fun(self: rexai.Hooks, row: rexai.Row): string|nil
----@field review fun(self: rexai.Hooks, ctx: table): boolean
+---@field review fun(self: rexai.Hooks, ctx: table)
 ---@field session_name fun(self: rexai.Hooks, path: string): string|nil
 
 -- The directory of the Block itself, nil when it has none.
@@ -91,11 +91,9 @@ function M.new(opts)
         return cwd_of(row)
     end
 
-    -- Hands the context of a row to `review`. True only when the function ran
-    -- without error. Every press says why nothing happened, because the user
-    -- asked for it.
+    -- Hands the context of a row to `review`. Every press says why nothing
+    -- happened, because the user asked for it.
     ---@param ctx table
-    ---@return boolean
     function object.review(_, ctx)
         local hook = config.get().review
         if type(hook) ~= 'function' then
@@ -104,7 +102,7 @@ function M.new(opts)
                     .. 'function(ctx) ... end to setup()',
                 vim.log.levels.INFO
             )
-            return false
+            return
         end
 
         local ok, err = pcall(hook, ctx)
@@ -113,9 +111,7 @@ function M.new(opts)
                 'rexai: review failed: ' .. tostring(err),
                 vim.log.levels.WARN
             )
-            return false
         end
-        return true
     end
 
     -- What `session_name` gives for the path of a new Session: the string, or
