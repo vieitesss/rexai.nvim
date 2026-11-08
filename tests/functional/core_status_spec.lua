@@ -152,4 +152,32 @@ describe('core.status', function()
             end)
         end
     end)
+
+    describe('text', function()
+        it('writes a status name as words', function()
+            assert.are.equal(
+                'needs input',
+                status.text({ status = 'needs_input' })
+            )
+        end)
+
+        it('adds the exit code of an exited row, zero included', function()
+            assert.are.equal(
+                'exited 3',
+                status.text({ status = 'exited', exit_code = 3 })
+            )
+            assert.are.equal(
+                'exited 0',
+                status.text({ status = 'exited', exit_code = 0 })
+            )
+        end)
+
+        it('leaves out a missing exit code', function()
+            assert.are.equal('exited', status.text({ status = 'exited' }))
+        end)
+
+        it('gives an empty string for a row with no status', function()
+            assert.are.equal('', status.text({}))
+        end)
+    end)
 end)

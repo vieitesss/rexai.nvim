@@ -88,8 +88,8 @@ end
 
 ---@param out rexai.Render
 ---@param line integer
----@return rexai.Highlight|nil the state span, last on its line
-local function row_state(out, line)
+---@return rexai.Highlight|nil the status span, last on its line
+local function row_status(out, line)
     local spans = spans_on(out, line)
     return spans[#spans]
 end
@@ -443,7 +443,7 @@ describe('ui.render', function()
             assert.are.equal('session:a session:b', labels_of(out))
         end)
 
-        it('shows glyph, state and age of a row', function()
+        it('shows glyph, status and age of a row', function()
             local sessions = {
                 session({
                     rows = {
@@ -458,17 +458,17 @@ describe('ui.render', function()
             local spans = spans_on(out, 2)
             assert.are.equal('!', text_of(out, spans[1]))
             assert.are.equal('RexaiNeedsInput', spans[1].group)
-            local state = assert(row_state(out, 2))
-            assert.are.equal('needs input', text_of(out, state))
-            assert.are.equal('RexaiNeedsInput', state.group)
+            local status_span = assert(row_status(out, 2))
+            assert.are.equal('needs input', text_of(out, status_span))
+            assert.are.equal('RexaiNeedsInput', status_span.group)
             assert.are.equal(
                 'needs input 42s',
-                out.lines[2]:sub(state.col_start + 1)
+                out.lines[2]:sub(status_span.col_start + 1)
             )
         end)
 
         it('shows the exit code of an exited row', function()
-            local function state_of(exit_code)
+            local function status_of(exit_code)
                 local sessions = {
                     session({
                         rows = {
@@ -480,13 +480,13 @@ describe('ui.render', function()
                     }),
                 }
                 local out = build(sessions)
-                local span = assert(row_state(out, 2))
+                local span = assert(row_status(out, 2))
                 assert.are.equal('RexaiExited', span.group)
                 return text_of(out, span)
             end
-            assert.are.equal('exited 3', state_of(3))
-            assert.are.equal('exited 0', state_of(0))
-            assert.are.equal('exited', state_of(nil))
+            assert.are.equal('exited 3', status_of(3))
+            assert.are.equal('exited 0', status_of(0))
+            assert.are.equal('exited', status_of(nil))
         end)
 
         it('shows no age without a time', function()
