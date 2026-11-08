@@ -102,21 +102,27 @@ end
 function M.lines(opts)
     local row = assert(opts.row, 'peek needs a row')
 
-    local header = {}
-    for _, part in ipairs({ row.label, row.harness, state_of(row) }) do
-        local text = one_line(part)
-        if text ~= '' then
-            header[#header + 1] = text
-        end
-    end
-
-    local out = { table.concat(header, M.SEPARATOR) }
-    for _, part in ipairs({ row.msg, opts.path, opts.git }) do
+    -- A part the row or the caller does not have is left out. Every part is
+    -- added on its own: a nil in a list would end `ipairs` and lose the parts
+    -- after it.
+    ---@param out string[]
+    ---@param part string|nil
+    local function add(out, part)
         local text = one_line(part)
         if text ~= '' then
             out[#out + 1] = text
         end
     end
+
+    local header = {}
+    add(header, row.label)
+    add(header, row.harness)
+    add(header, state_of(row))
+
+    local out = { table.concat(header, M.SEPARATOR) }
+    add(out, row.msg)
+    add(out, opts.path)
+    add(out, opts.git)
 
     -- The rule spans the widest line above it.
     local widest = 1
