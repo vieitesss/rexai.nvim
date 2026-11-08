@@ -59,3 +59,7 @@ format:
 # Record an anonymized fixture from the live Rex.
 fixture:
 	nvim --headless --noplugin -l tools/fixture.lua
+
+# Check the plugin against the live Rex. Run it by hand; CI has no Rex.
+smoke:
+	nvim --headless --noplugin -l tools/smoke.lua
