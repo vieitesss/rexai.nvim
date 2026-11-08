@@ -104,7 +104,7 @@ function M.new(opts)
             'status',
             '--porcelain=v2',
             '--branch',
-            '--untracked-files=normal',
+            '--untracked-files=all',
         }, function(err, stdout)
             if inflight[path] ~= ticket then
                 return
