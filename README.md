@@ -26,7 +26,7 @@ With any other manager, call `setup()` yourself:
 require('rexai').setup()
 ```
 
-The plugin defines only `:Rexai` at startup. The Dashboard code loads when the command runs. `setup()` is optional: without it the defaults apply.
+The plugin defines `:Rexai` and one session autocmd at startup. The Dashboard code loads when the command runs or a session loads. `setup()` is optional: without it the defaults apply.
 
 ## Use
 
@@ -46,6 +46,8 @@ Run `:Rexai`. The Dashboard is a buffer in the current window, and `q` gives tha
 ```
 
 The sample is a real render of invented names. A Session header shows the highest Agent status among its rows. When git works in a row's directory, a git column shows `repo · branch ↑ahead ↓behind ●changed`, leaving out zero counts. A row with no git result leaves that column blank.
+
+Sourcing a session that holds the Dashboard, as `:restart` does, gives the Dashboard back in every window that showed it, with its keys and its refresh.
 
 | Agent status | Glyph | Meaning |
 | --- | --- | --- |

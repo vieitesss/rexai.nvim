@@ -121,7 +121,7 @@ describe('ui.dashboard', function()
             local buf = assert(h:buf())
             assert.are.equal(buf, vim.api.nvim_win_get_buf(win))
 
-            assert.are.equal('nofile', vim.bo[buf].buftype)
+            assert.are.equal('', vim.bo[buf].buftype)
             assert.are.equal('hide', vim.bo[buf].bufhidden)
             assert.is_false(vim.bo[buf].swapfile)
             assert.are.equal('rexai', vim.bo[buf].filetype)

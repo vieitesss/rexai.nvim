@@ -71,6 +71,11 @@ local function windows()
     return vim.fn.win_findbuf(state.buf)
 end
 
+-- The buffer the Dashboard draws in, with the options it keeps. `buftype`
+-- stays empty on purpose: it is what makes `:mksession` write
+-- `edit rexai://dashboard` rather than `enew` and a `file` rename, and the
+-- `edit` lands on this buffer instead of colliding with its name. The
+-- `BufReadCmd` of the name answers that `edit`.
 ---@return integer
 local function ensure_buffer()
     if is_buffer(state.buf) then
@@ -78,7 +83,7 @@ local function ensure_buffer()
     end
 
     local buf = vim.fn.bufadd(M.NAME)
-    vim.bo[buf].buftype = 'nofile'
+    vim.bo[buf].buftype = ''
     vim.bo[buf].bufhidden = 'hide'
     vim.bo[buf].swapfile = false
     vim.bo[buf].filetype = M.FILETYPE
@@ -248,6 +253,35 @@ local function restore_cursors(saved, out)
     return lost
 end
 
+-- Writes a frame into the buffer: its lines and their highlights. A session
+-- gives the buffer back with `:edit rexai://dashboard`, which empties it, so
+-- the frame on screen is written again there.
+---@param lines string[]
+---@param highlights rexai.Highlight[]
+local function paint(lines, highlights)
+    local buf = state.buf
+    if not is_buffer(buf) then
+        return
+    end
+    ---@cast buf integer
+
+    vim.bo[buf].modifiable = true
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    -- `:edit` refuses a modified buffer with E37. Nothing writes this buffer,
+    -- so the flag goes: while 'modifiable' is still set, or it stays.
+    vim.bo[buf].modified = false
+    vim.bo[buf].modifiable = false
+
+    local ns = vim.api.nvim_create_namespace('rexai')
+    vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
+    for _, span in ipairs(highlights) do
+        vim.api.nvim_buf_set_extmark(buf, ns, span.line - 1, span.col_start, {
+            end_col = span.col_end,
+            hl_group = span.group,
+        })
+    end
+end
+
 ---@param out rexai.Render
 local function show(out)
     local buf = state.buf
@@ -275,18 +309,7 @@ local function show(out)
     end
 
     local saved = cursors()
-    vim.bo[buf].modifiable = true
-    vim.api.nvim_buf_set_lines(buf, 0, -1, false, out.lines)
-    vim.bo[buf].modifiable = false
-
-    local ns = vim.api.nvim_create_namespace('rexai')
-    vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
-    for _, span in ipairs(out.highlights) do
-        vim.api.nvim_buf_set_extmark(buf, ns, span.line - 1, span.col_start, {
-            end_col = span.col_end,
-            hl_group = span.group,
-        })
-    end
+    paint(out.lines, out.highlights)
 
     state.lines = out.lines
     state.highlights = out.highlights
@@ -635,9 +658,11 @@ end
 ---@field git table|nil test seam: `run` and `clock` of the git cache
 ---@field hooks table|nil test seam: `notify` of the hooks object
 
----@param opts rexai.DashboardOpts|nil
-function M.open(opts)
-    opts = opts or {}
+-- The state, buffer, keys and poller of a Dashboard, before a window shows it.
+-- An open and a window a session gave the Dashboard back to both start here.
+---@param opts rexai.DashboardOpts
+---@return integer buf
+local function prepare(opts)
     highlights.define()
     state.now = opts.now
     state.home_session_id = opts.home_session_id or vim.env.REX_SESSION
@@ -648,9 +673,33 @@ function M.open(opts)
     local buf = ensure_buffer()
     keymaps(buf)
     ensure_poller(opts)
+    return buf
+end
+
+-- The Dashboard on screen in `wins`: their window options, the autocmds that
+-- keep it drawn, a frame `:edit` emptied to write back, and the ask of Rex that
+-- fills it.
+---@param buf integer
+---@param wins integer[] the windows that show the buffer
+---@param frame { lines: string[], highlights: rexai.Highlight[] }|nil already drawn, then emptied
+local function present(buf, wins, frame)
+    for _, win in ipairs(wins) do
+        want_window_options(win)
+    end
+    ensure_autocmds(buf)
+    if frame then
+        paint(frame.lines, frame.highlights)
+    end
+    refresh_now()
+end
+
+---@param opts rexai.DashboardOpts|nil
+function M.open(opts)
+    opts = opts or {}
+    local buf = prepare(opts)
 
     -- The buffer goes into the window before the autocmds exist, so the first
-    -- render happens once and only once, below.
+    -- render happens once and only once, in `present`.
     local win = vim.api.nvim_get_current_win()
     local before = vim.api.nvim_win_get_buf(win)
     state.opening = true
@@ -658,11 +707,34 @@ function M.open(opts)
         state.previous_buf[win] = before
         vim.api.nvim_win_set_buf(win, buf)
     end
-    want_window_options(win)
-    ensure_autocmds(buf)
     state.opening = false
 
-    refresh_now()
+    present(buf, { win })
+end
+
+-- `:edit rexai://dashboard`, from a session the user sources or from
+-- `:restart`: the `BufReadCmd` of the name sends it here instead of Neovim
+-- reading a file. The buffer is the Dashboard this Neovim already has, so
+-- every window the session gave it shows the same live buffer, and a session
+-- that found no Dashboard here gets one where the session put it.
+---@param opts rexai.DashboardOpts|nil
+function M.read(opts)
+    -- Showing a buffer Neovim has not loaded yet loads it, and that read lands
+    -- here too. `open` is already building the Dashboard, so it takes over.
+    if state.opening then
+        return
+    end
+
+    opts = opts or {}
+    local buf = prepare(opts)
+
+    -- The `edit` emptied the buffer before this ran, so the frame on screen
+    -- goes back as it was: no window is blank while Rex is asked again.
+    local frame
+    if state.lines then
+        frame = { lines = state.lines, highlights = assert(state.highlights) }
+    end
+    present(buf, windows(), frame)
 end
 
 -- The target under the cursor of a window that shows the Dashboard. The

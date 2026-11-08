@@ -5,9 +5,9 @@
 -- and assertions stay in each spec.
 --
 -- The cleanup is owned, not a sweep: `new` records each value it replaces and
--- `close` puts those values back, wipes the Dashboard buffer this harness
--- opened and nothing else. A spec that checks for leaked plugin resources
--- sees them, because those checks run before `close`.
+-- `close` puts those values back, wipes the Dashboard buffer and nothing else.
+-- A spec that checks for leaked plugin resources sees them, because those
+-- checks run before `close`.
 
 local config = require('rexai.config')
 local dashboard = require('rexai.ui.dashboard')
@@ -400,17 +400,27 @@ function Harness:command(opts)
     return backend, calls
 end
 
+-- Wipes a buffer wherever it is shown, so nothing it owns outlives it.
+---@param buf integer|nil
+function Harness:wipe(buf)
+    if not (buf and vim.api.nvim_buf_is_valid(buf)) then
+        return
+    end
+    for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+        if vim.api.nvim_win_is_valid(win) then
+            vim.api.nvim_win_set_buf(win, replacement(self))
+        end
+    end
+    pcall(vim.api.nvim_buf_delete, buf, { force = true })
+end
+
 -- Puts the environment back: wiping the Dashboard buffer stops its poller and
 -- its git cache, and every replaced value returns.
 function Harness:close()
-    if self.opened and vim.api.nvim_buf_is_valid(self.opened) then
-        for _, win in ipairs(vim.fn.win_findbuf(self.opened)) do
-            if vim.api.nvim_win_is_valid(win) then
-                vim.api.nvim_win_set_buf(win, replacement(self))
-            end
-        end
-        pcall(vim.api.nvim_buf_delete, self.opened, { force = true })
-    end
+    self:wipe(self.opened)
+    -- A session load wipes the Dashboard buffer and makes a new one under the
+    -- same name, so the name finds a buffer `opened` no longer holds.
+    self:wipe(dashboard_buf())
     if vim.api.nvim_buf_is_valid(self.scratch) then
         vim.api.nvim_buf_delete(self.scratch, { force = true })
     end

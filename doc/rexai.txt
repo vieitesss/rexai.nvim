@@ -41,14 +41,18 @@ With lazy.nvim: >lua
 Or call setup() yourself: >lua
     require('rexai').setup()
 <
-Only |:Rexai| is defined at startup. The Dashboard code loads when the
-command runs. setup() is optional: without it the defaults apply.
+Only |:Rexai| and the session autocmd are defined at startup. The Dashboard
+code loads when the command runs or a session loads. setup() is optional:
+without it the defaults apply.
 
 ==============================================================================
 3. USAGE                                                         *rexai-usage*
 
                                                                     *:Rexai*
 :Rexai          Show the Dashboard in the current window.
+
+Sourcing a session that holds the Dashboard, as |:restart| does, gives the
+Dashboard back in every window that showed it, with its keys and its refresh.
 
 The Dashboard is a buffer in the current window. `q` (see |rexai-keys|)
 gives that window back its previous buffer. It lists the Sessions that hold
