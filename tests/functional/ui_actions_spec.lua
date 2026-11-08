@@ -1038,6 +1038,24 @@ describe('ui.actions', function()
                     assert.are.equal(1, refreshed)
                 end
             )
+
+            it('does not ask the hook once disposed', function()
+                local asked = 0
+                config.setup({
+                    session_name = function()
+                        asked = asked + 1
+                        return 'feature-42'
+                    end,
+                })
+
+                object:new_session()
+                prompts.answer_select('pi')
+                object:dispose()
+                prompts.answer_input(dir)
+
+                assert.are.equal(0, asked)
+                assert.are.same({}, backend.sessions)
+            end)
         end)
     end)
 end)

@@ -1,6 +1,7 @@
--- The two user hooks: `resolve_path` decides the directory a row stands for
--- and `review` receives the context of the row the `d` key is on. Both are
--- plain functions read from the config at call time.
+-- The three user hooks: `resolve_path` decides the directory a row stands
+-- for, `review` receives the context of the row the `d` key is on, and
+-- `session_name` names a new Session. All are plain functions read from the
+-- config at call time.
 
 local config = require('rexai.config')
 local hooks = require('rexai.hooks')
@@ -240,6 +241,148 @@ describe('hooks', function()
             assert.is_true(object:review(ctx()))
             assert.is_true(ran)
             assert.are.equal(1, #told.calls)
+        end)
+    end)
+
+    describe('session_name', function()
+        it('gives what the hook returned for the path', function()
+            config.setup({
+                session_name = function()
+                    return 'feature-42'
+                end,
+            })
+
+            assert.are.equal(
+                'feature-42',
+                hooks.new({ notify = told.notify }):session_name('/work/orbit')
+            )
+            assert.are.same({}, told.calls)
+        end)
+
+        it('honors a setup after the object was made', function()
+            local object = hooks.new({ notify = told.notify })
+            assert.is_nil(object:session_name('/work/orbit'))
+
+            config.setup({
+                session_name = function()
+                    return 'later'
+                end,
+            })
+
+            assert.are.equal('later', object:session_name('/work/orbit'))
+        end)
+
+        it('warns once per object for a throwing hook', function()
+            config.setup({
+                session_name = function()
+                    error('boom', 0)
+                end,
+            })
+            local object = hooks.new({ notify = told.notify })
+
+            for _ = 1, 3 do
+                assert.is_nil(object:session_name('/work/orbit'))
+            end
+
+            assert.are.equal(1, #told.calls)
+            assert.are.equal(vim.log.levels.WARN, told.calls[1].level)
+            assert.are.equal(
+                'rexai: session_name failed: boom',
+                told.calls[1].message
+            )
+
+            -- A second object is a second Dashboard, so it warns again.
+            hooks.new({ notify = told.notify }):session_name('/work/orbit')
+            assert.are.equal(2, #told.calls)
+        end)
+
+        it('has its own latch, independent of resolve_path', function()
+            config.setup({
+                resolve_path = function()
+                    error('path boom', 0)
+                end,
+                session_name = function()
+                    error('name boom', 0)
+                end,
+            })
+
+            -- A failing `resolve_path` first.
+            local object = hooks.new({ notify = told.notify })
+            object:resolve(row())
+            object:session_name('/work/orbit')
+
+            assert.are.equal(2, #told.calls)
+            assert.are.equal(
+                'rexai: resolve_path failed: path boom',
+                told.calls[1].message
+            )
+            assert.are.equal(
+                'rexai: session_name failed: name boom',
+                told.calls[2].message
+            )
+
+            -- And a failing `session_name` first.
+            told.calls = {}
+            object = hooks.new({ notify = told.notify })
+            object:session_name('/work/orbit')
+            object:resolve(row())
+
+            assert.are.equal(2, #told.calls)
+            assert.are.equal(
+                'rexai: session_name failed: name boom',
+                told.calls[1].message
+            )
+            assert.are.equal(
+                'rexai: resolve_path failed: path boom',
+                told.calls[2].message
+            )
+        end)
+
+        it('gives nothing and warns nothing for an unusable result', function()
+            ---@param value any
+            local function with(value)
+                config.setup({
+                    session_name = function()
+                        return value
+                    end,
+                })
+                return hooks
+                    .new({ notify = told.notify })
+                    :session_name('/work/orbit')
+            end
+
+            assert.is_nil(with(nil))
+            assert.is_nil(with(''))
+            assert.is_nil(with(42))
+            assert.is_nil(with(true))
+            assert.is_nil(with({}))
+            assert.are.same({}, told.calls)
+        end)
+
+        it('gives nil, and warns nothing, with no hook set', function()
+            local object = hooks.new({ notify = told.notify })
+
+            assert.is_nil(object:session_name('/work/orbit'))
+
+            config.setup({ session_name = 'not a function' })
+            assert.is_nil(object:session_name('/work/orbit'))
+
+            assert.are.same({}, told.calls)
+        end)
+
+        it('calls the hook with the path alone', function()
+            local got = { count = 0 }
+            config.setup({
+                session_name = function(...)
+                    got = { count = select('#', ...), first = ... }
+                    return 'feature-42'
+                end,
+            })
+
+            hooks.new({ notify = told.notify }):session_name('/work/orbit')
+
+            assert.are.equal(1, got.count)
+            assert.are.equal('/work/orbit', got.first)
         end)
     end)
 end)
