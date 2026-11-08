@@ -24,6 +24,7 @@ local M = {}
 ---@field focus fun(self: rexai.Actions) goes to the Agent block or Session
 ---@field review fun(self: rexai.Actions) reviews the Agent block of the row
 ---@field peek fun(self: rexai.Actions) shows the float of the Agent block
+---@field cancel_peek fun(self: rexai.Actions) cancels the peek and forgets its float
 ---@field new_window fun(self: rexai.Actions) adds an Agent Window to a Session
 ---@field new_session fun(self: rexai.Actions) starts a Session with an Agent Window
 ---@field dispose fun(self: rexai.Actions) drops every pending continuation
@@ -40,9 +41,9 @@ function M.new(opts)
 
     local disposed = false
 
-    -- The Block whose float is open, and how many `K` presses there were: only
-    -- the newest press shows its result, so a slow one never covers a newer
-    -- one.
+    -- The Block whose float is open, and a counter that every `K` press and
+    -- every `cancel_peek` raises: only the newest one shows its result, so a
+    -- slow `K` never covers a newer one.
     local peeked = nil
     local peeks = 0
 
@@ -201,6 +202,17 @@ function M.new(opts)
                 peeked = block_id
             end)
         )
+    end
+
+    -- Forgets the float `K` opened, so another float may replace it: the next
+    -- `K` asks Rex again instead of entering it, and a pending result no
+    -- longer covers it.
+    function object.cancel_peek(_)
+        if disposed then
+            return
+        end
+        peeks = peeks + 1
+        peeked = nil
     end
 
     -- The directory an answer names: `~` expanded, absolute, without a

@@ -1,9 +1,10 @@
--- The float of the `K` key: a hover-like window at the cursor with the lines
--- `core.peek` builds. One float at a time; it closes as soon as the cursor
--- moves, the Dashboard buffer is left or the user is done with it.
+-- The float of the Dashboard: a hover-like window at the cursor with the lines
+-- it is given. One float at a time; it closes as soon as the cursor moves, the
+-- Dashboard buffer is left or the user is done with it.
 --
--- Only the window mechanics live here. What the float says is `core.peek`,
--- and when it opens is `ui.actions`.
+-- Only the window mechanics live here. The `K` key shows the lines `core.peek`
+-- builds, and `ui.actions` decides when; the `?` key shows the lines
+-- `core.help` builds, and `ui.dashboard` decides when.
 
 local M = {}
 

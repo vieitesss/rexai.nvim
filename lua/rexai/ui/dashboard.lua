@@ -8,7 +8,9 @@ local actions = require('rexai.ui.actions')
 local config = require('rexai.config')
 local core_git = require('rexai.core.git')
 local data = require('rexai.ui.data')
+local float = require('rexai.ui.peek')
 local git = require('rexai.git')
+local help = require('rexai.core.help')
 local highlights = require('rexai.ui.highlights')
 local hooks = require('rexai.hooks')
 local model = require('rexai.core.model')
@@ -340,60 +342,69 @@ local function toggle_exited()
     draw()
 end
 
--- Every normal-mode key of the Dashboard. Later Work Items add their keys
--- here.
+-- Every normal-mode key of the Dashboard, in the order `?` lists them: the key,
+-- what it does (the `desc` of its keymap) and what it runs.
+---@type { [1]: string, [2]: string, [3]: fun() }[]
+local KEYS
+
+-- `?`: a float at the cursor with every key of the Dashboard. It closes as
+-- soon as the cursor moves, like the float of `K`.
+local function show_keys()
+    state.actions:cancel_peek()
+    float.show(help.lines(KEYS))
+end
+
+KEYS = {
+    { 'q', 'Close the Dashboard', quit },
+    {
+        '<CR>',
+        'Go to the Agent block or Session',
+        function()
+            state.actions:focus()
+        end,
+    },
+    { 'r', 'Refresh the Dashboard', ask_rex },
+    { 'e', 'Toggle the Exited rows', toggle_exited },
+    {
+        'd',
+        'Review the Agent block',
+        function()
+            state.actions:review()
+        end,
+    },
+    {
+        'K',
+        'Peek at the Agent block',
+        function()
+            state.actions:peek()
+        end,
+    },
+    {
+        'n',
+        'Add a Window to the Session',
+        function()
+            state.actions:new_window()
+        end,
+    },
+    {
+        'N',
+        'Start a Session',
+        function()
+            state.actions:new_session()
+        end,
+    },
+    { '?', 'Show these keys', show_keys },
+}
+
 ---@param buf integer
 local function keymaps(buf)
-    vim.keymap.set('n', 'q', quit, {
-        buffer = buf,
-        nowait = true,
-        desc = 'Close the Dashboard',
-    })
-    vim.keymap.set('n', '<CR>', function()
-        state.actions:focus()
-    end, {
-        buffer = buf,
-        nowait = true,
-        desc = 'Go to the Agent block or Session',
-    })
-    vim.keymap.set('n', 'r', ask_rex, {
-        buffer = buf,
-        nowait = true,
-        desc = 'Refresh the Dashboard',
-    })
-    vim.keymap.set('n', 'e', toggle_exited, {
-        buffer = buf,
-        nowait = true,
-        desc = 'Toggle the Exited rows',
-    })
-    vim.keymap.set('n', 'd', function()
-        state.actions:review()
-    end, {
-        buffer = buf,
-        nowait = true,
-        desc = 'Review the Agent block',
-    })
-    vim.keymap.set('n', 'K', function()
-        state.actions:peek()
-    end, {
-        buffer = buf,
-        nowait = true,
-        desc = 'Peek at the Agent block',
-    })
-    vim.keymap.set('n', 'n', function()
-        state.actions:new_window()
-    end, {
-        buffer = buf,
-        nowait = true,
-        desc = 'Add a Window to the Session',
-    })
-    vim.keymap.set('n', 'N', function()
-        state.actions:new_session()
-    end, {
-        buffer = buf,
-        nowait = true,
-        desc = 'Start a Session',
-    })
+    for _, key in ipairs(KEYS) do
+        vim.keymap.set('n', key[1], key[3], {
+            buffer = buf,
+            nowait = true,
+            desc = key[2],
+        })
+    end
 end
 
 -- Forgets everything about the Dashboard once its buffer is wiped, so no

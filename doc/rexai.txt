@@ -107,6 +107,10 @@ These keys work in the Dashboard buffer, in normal mode.
     n     Add a Window to the Session under the cursor. See
           |rexai-starting|.
     N     Start a Session for a directory you name. See |rexai-starting|.
+    ?     Open a float with one line per Dashboard key, the key and what
+          it does. It replaces Vim's backward search in the Dashboard
+          buffer. The float is the one K opens: it closes when the cursor
+          moves, on entering Insert mode, or when the buffer is left.
 
 ==============================================================================
 5. CONFIGURATION                                                *rexai-config*

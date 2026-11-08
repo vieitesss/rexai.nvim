@@ -369,6 +369,148 @@ describe('ui.dashboard keys', function()
         end)
     end)
 
+    describe('?', function()
+        -- A Backend that answers `snapshot` at once and holds every `peek`
+        -- until the test answers it, so the test decides when a result
+        -- arrives.
+        ---@param snapshot table
+        ---@return table
+        local function holding_peek(snapshot)
+            local object = { pending = {} }
+
+            function object.snapshot(callback)
+                callback(nil, snapshot)
+            end
+
+            function object.focus(_, callback)
+                callback(nil)
+            end
+
+            function object.create_window(_, callback)
+                callback(nil)
+            end
+
+            function object.create_session(_, callback)
+                callback(nil)
+            end
+
+            function object.peek(_, callback)
+                object.pending[#object.pending + 1] = callback
+            end
+
+            -- Answers the oldest `peek` call with `text`.
+            ---@param text string
+            function object.answer(text)
+                local callback = table.remove(object.pending, 1)
+                assert.is_not_nil(callback, 'no peek call is waiting')
+                callback(nil, text)
+            end
+
+            return object
+        end
+
+        -- The lines of the float, joined, so a test says what it looks for.
+        ---@return string
+        local function float_text()
+            return table.concat(assert(h:float_lines()), '\n')
+        end
+
+        it('lists every key of the Dashboard in a float', function()
+            h:open({ snapshots = { TWO } })
+            local buf = assert(h:buf())
+
+            h:press('?')
+
+            local lines = assert(h:float_lines())
+            local maps = vim.api.nvim_buf_get_keymap(buf, 'n')
+            assert.are.equal(#maps, #lines)
+            for _, map in ipairs(maps) do
+                local found = false
+                for _, line in ipairs(lines) do
+                    -- A key sits first on its line, a description after it.
+                    if
+                        vim.startswith(line, map.lhs .. ' ')
+                        and vim.endswith(line, map.desc)
+                    then
+                        found = true
+                    end
+                end
+                assert.is_true(found, 'no line for the key ' .. map.lhs)
+            end
+        end)
+
+        it('closes when the cursor moves', function()
+            h:open({ snapshots = { TWO } })
+            h:press('?')
+            assert.is_not_nil(h:float())
+
+            -- A headless Neovim fires no CursorMoved for a keystroke.
+            vim.api.nvim_win_set_cursor(
+                vim.api.nvim_get_current_win(),
+                { 2, 0 }
+            )
+            vim.api.nvim_exec_autocmds(
+                'CursorMoved',
+                { buffer = assert(h:buf()) }
+            )
+
+            assert.is_nil(h:float())
+        end)
+
+        it('leaves the Dashboard where it was', function()
+            h:open({ snapshots = { TWO } })
+            local win = vim.api.nvim_get_current_win()
+            local before = vim.api.nvim_win_get_cursor(win)
+
+            h:press('?')
+
+            assert.are.equal(win, vim.api.nvim_get_current_win())
+            assert.are.same(before, vim.api.nvim_win_get_cursor(win))
+        end)
+
+        it('lets K show the Agent block again', function()
+            local _, calls = h:open({
+                snapshots = { TWO },
+                peek = { ['block:k1'] = 'the build is green' },
+            })
+            vim.api.nvim_win_set_cursor(vim.api.nvim_get_current_win(), {
+                support.line_of(targets_of(TWO), 'block:k1'),
+                0,
+            })
+            h:press('K')
+            assert.is_not_nil(float_text():find('the build is green', 1, true))
+
+            h:press('?')
+            assert.is_not_nil(float_text():find('Close the Dashboard', 1, true))
+
+            h:press('K')
+
+            assert.are.equal(1, #support.floats())
+            assert.is_not_nil(float_text():find('the build is green', 1, true))
+            -- The second K asks Rex again instead of entering the help.
+            assert.are.equal(2, support.count(calls, 'peek'))
+        end)
+
+        it('keeps the help float when a held peek result arrives', function()
+            local held = holding_peek(TWO)
+            h:open({ backend = held })
+            vim.api.nvim_win_set_cursor(vim.api.nvim_get_current_win(), {
+                support.line_of(targets_of(TWO), 'block:k1'),
+                0,
+            })
+            h:press('K')
+
+            h:press('?')
+            assert.is_not_nil(float_text():find('Close the Dashboard', 1, true))
+
+            held.answer('the build is green')
+
+            assert.are.equal(1, #support.floats())
+            assert.is_nil(float_text():find('the build is green', 1, true))
+            assert.is_not_nil(float_text():find('Close the Dashboard', 1, true))
+        end)
+    end)
+
     describe('the keymaps', function()
         it(
             'are only in the Dashboard buffer, with a desc and nowait',
@@ -384,6 +526,7 @@ describe('ui.dashboard keys', function()
                     K = 'Peek at the Agent block',
                     n = 'Add a Window to the Session',
                     N = 'Start a Session',
+                    ['?'] = 'Show these keys',
                 }
                 for lhs, desc in pairs(wanted) do
                     local map = vim.fn.maparg(lhs, 'n', false, true)

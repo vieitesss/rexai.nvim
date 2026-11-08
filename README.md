@@ -69,6 +69,7 @@ Keys in the Dashboard:
 | `K` | Open a float with what is known about the Agent block and the last lines of its screen. Press `K` again to enter the float. |
 | `n` | Add a Window to the Session under the cursor. |
 | `N` | Start a Session for a directory you name. |
+| `?` | Open a float with one line per Dashboard key. Replaces Vim's backward search here. Closes when the cursor moves. |
 
 While a window shows the Dashboard and Neovim has focus, it asks Rex every `refresh_ms`. It also asks when it opens, on `r`, and when Neovim gains focus. When Rex cannot be read, the Dashboard shows `Rex unreadable:` with the reason and retries after 5 seconds.
 
