@@ -44,7 +44,6 @@ local state = {
     targets = {},
     data = nil,
     actions = nil,
-    hooks = nil,
     show_exited = nil,
     poller = nil,
     git = nil,
@@ -414,7 +413,6 @@ local function cleanup(group)
     state.buf = nil
     state.lines, state.highlights, state.targets = nil, nil, {}
     state.data, state.show_exited = nil, nil
-    state.hooks = nil
     state.previous_buf = {}
     state.focused = true
     state.saved = {}
@@ -543,14 +541,15 @@ local function ensure_poller(opts)
     })
 
     -- One hooks object per Dashboard too: a hook that failed reports once per
-    -- open, and `cleanup` starts that count again.
+    -- open, and `cleanup` starts that count again. The data and the actions
+    -- hold it for as long as they live.
     local hooks_opts = opts.hooks or {}
-    state.hooks = hooks.new({ notify = hooks_opts.notify })
+    local hook_object = hooks.new({ notify = hooks_opts.notify })
 
     -- The snapshot preparation and the joins the keys need. The memory is the
     -- process-wide one, so an Exited row outlives this Dashboard.
     state.data = data.new({
-        hooks = state.hooks,
+        hooks = hook_object,
         git = state.git,
         memory = MEMORY,
     })
@@ -560,7 +559,7 @@ local function ensure_poller(opts)
     state.actions = actions.new({
         backend = backend,
         data = state.data,
-        hooks = state.hooks,
+        hooks = hook_object,
         refresh = refresh_now,
         current_target = M.current_target,
     })
