@@ -32,6 +32,18 @@ local function row(changes)
     return out
 end
 
+-- One Agent row without the keys named, as one that never had them.
+---@param missing string[]
+---@param changes table|nil
+---@return table
+local function row_without(missing, changes)
+    local out = row(changes)
+    for _, key in ipairs(missing) do
+        out[key] = nil
+    end
+    return out
+end
+
 describe('core.peek', function()
     describe('the header', function()
         it('holds the label, the harness and the status', function()
@@ -106,6 +118,44 @@ describe('core.peek', function()
             assert.are.equal('/tmp', out[2])
             assert.are.equal(rule(18), out[3])
             assert.are.equal(3, #out)
+        end)
+
+        it('holds the path and the git slot with no message', function()
+            local out = peek.lines({
+                row = row_without({ 'msg' }),
+                path = '/work/orbit',
+                git = 'orbit · main ●2',
+            })
+
+            assert.are.equal('/work/orbit', out[2])
+            assert.are.equal('orbit · main ●2', out[3])
+            assert.are.equal(rule(18), out[4])
+        end)
+
+        it('holds the git slot with no message and no path', function()
+            local out = peek.lines({
+                row = row_without({ 'msg' }),
+                git = 'orbit · main',
+            })
+
+            assert.are.equal('orbit · main', out[2])
+            assert.are.equal(rule(18), out[3])
+        end)
+
+        it('is the header alone when nothing else is known', function()
+            local out = peek.lines({ row = row_without({ 'msg' }) })
+
+            assert.are.same({ 'api pi · pi · done', rule(18) }, out)
+        end)
+    end)
+
+    describe('the header without a harness', function()
+        it('holds the label and the status', function()
+            local out = peek.lines({
+                row = row_without({ 'harness' }, { msg = '' }),
+            })
+
+            assert.are.equal('api pi · done', out[1])
         end)
     end)
 
