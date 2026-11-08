@@ -246,17 +246,6 @@ function M.new(opts)
         return core_launch.session_label(path, vim.uv.os_homedir(), custom)
     end
 
-    -- The first Session of the accepted snapshot with `label`, if any.
-    ---@param label string
-    ---@return rexai.ModelSession|nil
-    local function session_named(label)
-        for _, session in ipairs(data:sessions() or {}) do
-            if session.label == label then
-                return session
-            end
-        end
-    end
-
     -- Asks for an agent and a directory and hands both to `create` with the
     -- number of this press. A cancelled prompt ends the flow silently; a press
     -- made after this one makes every continuation of this one return.
@@ -381,7 +370,9 @@ function M.new(opts)
     end
 
     -- `N`: starts a Session with an Agent Window, or adds the Window to the
-    -- Session that already has the label of the directory.
+    -- Session that already has the label of the directory. The data object
+    -- holds every Session Rex reported, so a Session with no Agent blocks is
+    -- reused too instead of being started twice.
     function object.new_session(_)
         if disposed then
             return
@@ -391,7 +382,7 @@ function M.new(opts)
             local label = session_label(dir)
             local command =
                 core_launch.command(agent, config.get().agents.launch)
-            local existing = session_named(label)
+            local existing = data:session_named(label)
 
             if existing then
                 backend.create_window(

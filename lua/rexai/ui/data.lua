@@ -1,7 +1,7 @@
 -- What the Dashboard derives from the snapshot Rex accepted: the model
--- Sessions, what Rex calls the Home session and the directory of every row.
--- The keys look a row up here instead of joining the Session, path and git
--- maps themselves.
+-- Sessions, every Session Rex reported, what it calls the Home session and the
+-- directory of every row. The keys look a row up here instead of joining the
+-- Session, path and git maps themselves.
 
 local config = require('rexai.config')
 local model = require('rexai.core.model')
@@ -14,6 +14,10 @@ local M = {}
 ---@field path string|nil the directory the row stands for
 ---@field git rexai.GitInfo|nil what the git cache knows about `path`
 
+---@class rexai.DataSession one Session of the accepted snapshot
+---@field id string
+---@field label string
+
 ---@class rexai.DataOpts
 ---@field hooks rexai.Hooks
 ---@field git rexai.Git|nil
@@ -23,21 +27,9 @@ local M = {}
 ---@field accept fun(self: rexai.Data, snapshot: table, home_session_id: string|nil)
 ---@field clear fun(self: rexai.Data)
 ---@field sessions fun(self: rexai.Data): rexai.ModelSession[]|nil
+---@field session_named fun(self: rexai.Data, label: string): rexai.DataSession|nil
 ---@field home_label fun(self: rexai.Data): string|nil
 ---@field context fun(self: rexai.Data, block_id: string): rexai.RowContext|nil
-
--- What Rex calls the Home session, from the snapshot itself: the model drops a
--- Session with no Agent blocks, so its name is lost with it.
----@param snapshot table
----@param home_session_id string|nil
----@return string|nil
-local function label_of_home(snapshot, home_session_id)
-    for _, session in ipairs(snapshot.sessions or {}) do
-        if session.id == home_session_id then
-            return session.label
-        end
-    end
-end
 
 ---@param opts rexai.DataOpts
 ---@return rexai.Data
@@ -48,7 +40,13 @@ function M.new(opts)
     local memory = opts.memory or model.new_memory()
 
     local sessions
-    local home_label
+    local home_id
+
+    -- Every Session Rex reported in the accepted snapshot, in snapshot order,
+    -- with its id and label alone. The model drops a Session that has no Agent
+    -- blocks, so creation and the Home label look their Session up here.
+    ---@type rexai.DataSession[]
+    local catalog = {}
 
     -- One entry per Agent row of the accepted snapshot, by Block id. The path
     -- hook runs once for each of them here, Exited rows included, so a redraw
@@ -59,12 +57,20 @@ function M.new(opts)
     local object = {}
 
     -- Takes a snapshot Rex accepted: builds the Sessions the render shows,
-    -- captures the Home label and resolves the path of every row.
+    -- catalogs the Sessions it reports and resolves the path of every row.
     ---@param snapshot table
     ---@param home_session_id string|nil
     function object.accept(_, snapshot, home_session_id)
         sessions = model.build(snapshot, config.get().agents, memory)
-        home_label = label_of_home(snapshot, home_session_id)
+        home_id = home_session_id
+
+        catalog = {}
+        for _, session in ipairs(snapshot.sessions or {}) do
+            catalog[#catalog + 1] = {
+                id = session.id,
+                label = session.label,
+            }
+        end
 
         rows = {}
         for _, session in ipairs(sessions) do
@@ -81,7 +87,8 @@ function M.new(opts)
     -- The rows of the last accepted snapshot are stale once Rex cannot be
     -- read, so the Dashboard drops them all.
     function object.clear(_)
-        sessions, home_label, rows = nil, nil, {}
+        sessions, home_id, rows = nil, nil, {}
+        catalog = {}
     end
 
     ---@return rexai.ModelSession[]|nil
@@ -89,9 +96,27 @@ function M.new(opts)
         return sessions
     end
 
+    -- The first Session of the accepted snapshot with `label`, in snapshot
+    -- order: a Session the model dropped is found here too.
+    ---@param label string
+    ---@return rexai.DataSession|nil
+    function object.session_named(_, label)
+        for _, session in ipairs(catalog) do
+            if session.label == label then
+                return session
+            end
+        end
+    end
+
+    -- What Rex calls the Home session, or nil when the snapshot does not list
+    -- the Session that holds this Neovim.
     ---@return string|nil
     function object.home_label(_)
-        return home_label
+        for _, session in ipairs(catalog) do
+            if session.id == home_id then
+                return session.label
+            end
+        end
     end
 
     -- The row and everything an action needs about it: its Session, the
