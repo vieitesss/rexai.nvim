@@ -178,24 +178,19 @@ describe('hooks', function()
             }
         end
 
-        it(
-            'reports that no review function is set, and returns false',
-            function()
-                assert.is_false(
-                    hooks.new({ notify = told.notify }):review(ctx())
-                )
+        it('reports that no review function is set', function()
+            hooks.new({ notify = told.notify }):review(ctx())
 
-                assert.are.equal(1, #told.calls)
-                assert.are.equal(vim.log.levels.INFO, told.calls[1].level)
-                assert.are.equal(
-                    'rexai: no review function is set; add review = '
-                        .. 'function(ctx) ... end to setup()',
-                    told.calls[1].message
-                )
-            end
-        )
+            assert.are.equal(1, #told.calls)
+            assert.are.equal(vim.log.levels.INFO, told.calls[1].level)
+            assert.are.equal(
+                'rexai: no review function is set; add review = '
+                    .. 'function(ctx) ... end to setup()',
+                told.calls[1].message
+            )
+        end)
 
-        it('calls the hook with the context and returns true', function()
+        it('calls the hook with the context', function()
             local got
             config.setup({
                 review = function(given)
@@ -204,20 +199,20 @@ describe('hooks', function()
             })
             local wanted = ctx()
 
-            assert.is_true(hooks.new({ notify = told.notify }):review(wanted))
+            hooks.new({ notify = told.notify }):review(wanted)
 
             assert.are.equal(wanted, got)
             assert.are.same({}, told.calls)
         end)
 
-        it('reports a throwing hook, and returns false', function()
+        it('reports a throwing hook', function()
             config.setup({
                 review = function()
                     error('boom', 0)
                 end,
             })
 
-            assert.is_false(hooks.new({ notify = told.notify }):review(ctx()))
+            hooks.new({ notify = told.notify }):review(ctx())
 
             assert.are.equal(1, #told.calls)
             assert.are.equal(vim.log.levels.WARN, told.calls[1].level)
@@ -229,7 +224,7 @@ describe('hooks', function()
 
         it('honors a setup after the object was made', function()
             local object = hooks.new({ notify = told.notify })
-            assert.is_false(object:review(ctx()))
+            object:review(ctx())
 
             local ran = false
             config.setup({
@@ -238,7 +233,7 @@ describe('hooks', function()
                 end,
             })
 
-            assert.is_true(object:review(ctx()))
+            object:review(ctx())
             assert.is_true(ran)
             assert.are.equal(1, #told.calls)
         end)
