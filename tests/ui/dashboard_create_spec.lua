@@ -456,6 +456,24 @@ describe('ui.dashboard create', function()
             assert.are.equal(1, #object.creates)
         end)
 
+        it('adds a Window to a Session with no Agent blocks', function()
+            config.setup({
+                session_name = function()
+                    return 'landing'
+                end,
+            })
+            local object = holding_backend(HOME_ONLY)
+            h:open({ backend = object, home_session_id = HOME })
+            put_cursor_on(1)
+
+            h:press('N')
+            answer_prompts('pi', dir)
+
+            assert.are.equal(1, #object.creates)
+            assert.are.equal('create_window', object.creates[1].method)
+            assert.are.equal('session:home', object.creates[1].spec.session_id)
+        end)
+
         it('leaves the view alone with focus_new off', function()
             config.setup({ focus_new = false })
             local object = holding_backend(ONE)

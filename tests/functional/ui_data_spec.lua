@@ -65,6 +65,13 @@ local ENDED = snap.snapshot({
     }),
 })
 
+-- The same two Agent blocks and, after them, a Session with no Agent blocks:
+-- the model drops it, while Rex still reports it.
+local QUIET = snap.snapshot({
+    SNAPSHOT.sessions[1],
+    snap.session({ id = 'session:quiet', label = 'quiet', windows = {} }),
+})
+
 ---@param resolve fun(row: rexai.Row): string|nil
 ---@return table a hooks object that records every row it is asked about
 local function stub_hooks(resolve)
@@ -175,6 +182,21 @@ describe('ui.data', function()
             )
         end)
 
+        it(
+            'captures the Home label of a Session with no Agent blocks',
+            function()
+                local d = object()
+                d:accept(QUIET, 'session:quiet')
+
+                -- The model keeps only the Session with Agent rows, so the label
+                -- comes from the Session catalog.
+                local sessions = assert(d:sessions())
+                assert.are.equal(1, #sessions)
+                assert.are.equal('orbit', sessions[1].label)
+                assert.are.equal('quiet', d:home_label())
+            end
+        )
+
         it('forgets the snapshot on clear', function()
             local d = object()
             d:accept(SNAPSHOT, 'session:orbit')
@@ -183,6 +205,62 @@ describe('ui.data', function()
             assert.is_nil(d:sessions())
             assert.is_nil(d:home_label())
             assert.is_nil(d:context('block:b1'))
+        end)
+    end)
+
+    describe('session_named', function()
+        it('finds a Session with no Agent blocks', function()
+            local d = object()
+            d:accept(QUIET, nil)
+
+            local found = assert(d:session_named('quiet'))
+            assert.are.equal('session:quiet', found.id)
+            assert.are.equal('quiet', found.label)
+        end)
+
+        it('finds nothing for a label the snapshot does not hold', function()
+            local d = object()
+            d:accept(QUIET, nil)
+
+            assert.is_nil(d:session_named('elsewhere'))
+        end)
+
+        it('gives the first of two Sessions with one label', function()
+            local twins = snap.snapshot({
+                snap.session({ id = 'session:one', label = 'twin' }),
+                snap.session({ id = 'session:two', label = 'twin' }),
+            })
+            local d = object()
+            d:accept(twins, nil)
+
+            assert.are.equal('session:one', assert(d:session_named('twin')).id)
+        end)
+
+        it('forgets a renamed Session when a snapshot replaces it', function()
+            local renamed = snap.snapshot({
+                SNAPSHOT.sessions[1],
+                snap.session({
+                    id = 'session:quiet',
+                    label = 'renamed',
+                    windows = {},
+                }),
+            })
+            local d = object()
+            d:accept(QUIET, nil)
+            d:accept(renamed, nil)
+
+            assert.is_nil(d:session_named('quiet'))
+            local found = assert(d:session_named('renamed'))
+            assert.are.equal('session:quiet', found.id)
+        end)
+
+        it('forgets every Session on clear', function()
+            local d = object()
+            d:accept(QUIET, nil)
+            d:clear()
+
+            assert.is_nil(d:session_named('quiet'))
+            assert.is_nil(d:session_named('orbit'))
         end)
     end)
 

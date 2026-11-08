@@ -63,6 +63,9 @@ local SNAPSHOT = snap.snapshot({
             }),
         },
     }),
+    -- A Session Rex reports with no Agent block in it, after the one above: the
+    -- model drops it, so creation cannot see it in the rows.
+    snap.session({ id = 'session:quiet', label = 'quiet', windows = {} }),
 })
 
 -- The Row the model builds for `block:b1`.
@@ -892,6 +895,28 @@ describe('ui.actions', function()
                 assert.are.same({
                     {
                         session_id = 'session:s1',
+                        name = 'pi',
+                        cwd = dir,
+                        command = { 'pi' },
+                        keep_open = true,
+                        focus = false,
+                    },
+                }, backend.windows)
+            end)
+
+            it('adds a Window to a Session that has no Agent blocks', function()
+                config.setup({
+                    session_name = function()
+                        return 'quiet'
+                    end,
+                })
+
+                answer('Session', 'pi', dir)
+
+                assert.are.same({}, backend.sessions)
+                assert.are.same({
+                    {
+                        session_id = 'session:quiet',
                         name = 'pi',
                         cwd = dir,
                         command = { 'pi' },
