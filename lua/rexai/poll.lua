@@ -20,7 +20,7 @@ local M = {}
 ---@param callback fun()
 ---@return fun() cancel
 local function after(ms, callback)
-    local timer = vim.uv.new_timer()
+    local timer = assert(vim.uv.new_timer())
     local cancelled = false
 
     local function cancel()

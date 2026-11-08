@@ -5,7 +5,7 @@
 local M = {}
 
 ---@class rexai.FakeOpts
----@field snapshots table[] served in order; the last one repeats
+---@field snapshots table[]|nil served in order; the last one repeats
 ---@field peek table<string, string>|nil screen text by block id
 
 ---@param snapshot table
@@ -34,8 +34,11 @@ local function has_target(snapshot, target)
     return false
 end
 
+---@class rexai.FakeBackend : rexai.Backend
+---@field fail_next fun(method: string, message: string) makes the next call fail
+
 ---@param opts rexai.FakeOpts
----@return rexai.Backend backend
+---@return rexai.FakeBackend backend
 ---@return table[] calls every call made, in order: `{ method, arg }`
 function M.new(opts)
     opts = opts or {}
@@ -98,7 +101,7 @@ function M.new(opts)
             end
             created = created + 1
             callback(nil, {
-                session_id = spec.session_id or 'session:fake-' .. created,
+                session_id = spec.session_id or ('session:fake-' .. created),
                 window_id = 'window:fake-' .. created,
                 block_id = 'block:fake-' .. created,
             })

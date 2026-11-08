@@ -70,9 +70,10 @@ local function windows()
     return vim.fn.win_findbuf(state.buf)
 end
 
+---@return integer
 local function ensure_buffer()
     if is_buffer(state.buf) then
-        return state.buf
+        return assert(state.buf)
     end
 
     local buf = vim.fn.bufadd(M.NAME)
@@ -99,7 +100,7 @@ local function quit()
     end
 
     local previous = state.previous_buf
-    if is_buffer(previous) and previous ~= state.buf then
+    if previous and is_buffer(previous) and previous ~= state.buf then
         return vim.api.nvim_win_set_buf(win, previous)
     end
 
@@ -207,6 +208,7 @@ local function show(out)
     if not is_buffer(buf) then
         return
     end
+    ---@cast buf integer
 
     -- The targets of every frame are published, even when the text and the
     -- highlights are the same: Rex may replace a Block, Window or Session with
@@ -259,7 +261,7 @@ local function git_slots(sessions)
                 if path then
                     state.git:request(path)
                     paths[#paths + 1] = path
-                    if ctx.git then
+                    if ctx and ctx.git then
                         slots[row.block_id] = core_git.format(ctx.git)
                     end
                 end

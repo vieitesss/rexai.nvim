@@ -23,7 +23,10 @@ end
 ---@param rows table[]
 function M.assign(window_label, rows)
     local default_id = M.default_id(window_label)
-    local custom = window_label ~= nil and window_label ~= ''
+    local custom = window_label
+    if custom == '' then
+        custom = nil
+    end
     local seen = {}
 
     for _, row in ipairs(rows) do
@@ -33,9 +36,9 @@ function M.assign(window_label, rows)
         elseif not custom then
             label = row.harness
         elseif #rows > 1 then
-            label = window_label .. ' ' .. row.harness
+            label = custom .. ' ' .. row.harness
         else
-            label = window_label
+            label = custom
         end
 
         local base, number = label, 2

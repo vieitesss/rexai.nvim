@@ -50,7 +50,7 @@ function M.new(opts)
     -- Runs `rex <args>` and calls `done(err, stdout)` on the main loop. It
     -- never starts a Rex server: with none running, there is nothing to show.
     ---@param args string[]
-    ---@param done fun(err: string|nil, stdout: string|nil)
+    ---@param done fun(err: string|nil, stdout: string)
     local function run(args, done)
         local argv = { bin, '--autostart=false' }
         vim.list_extend(argv, args)
@@ -61,14 +61,14 @@ function M.new(opts)
             { text = true, timeout = timeout_ms },
             vim.schedule_wrap(function(result)
                 if result.code ~= 0 then
-                    return done(describe_failure(result, timeout_ms))
+                    return done(describe_failure(result, timeout_ms), '')
                 end
                 done(nil, result.stdout or '')
             end)
         )
         if not spawned then
             vim.schedule(function()
-                done('cannot run ' .. bin .. ': ' .. tostring(err))
+                done('cannot run ' .. bin .. ': ' .. tostring(err), '')
             end)
         end
     end

@@ -38,7 +38,7 @@ end
 ---@field on_change (fun())|nil called when a result changes what `get` returns
 
 ---@class rexai.Git
----@field get fun(self: rexai.Git, path: string): rexai.GitInfo|nil
+---@field get fun(self: rexai.Git, path: string|nil): rexai.GitInfo|nil
 ---@field request fun(self: rexai.Git, path: string|nil)
 ---@field retain fun(self: rexai.Git, paths: string[])
 ---@field stop fun(self: rexai.Git)
@@ -65,7 +65,7 @@ function M.new(opts)
 
     local object = {}
 
-    ---@param path string
+    ---@param path string|nil
     ---@return rexai.GitInfo|nil
     local function current(path)
         local entry = entries[path]
@@ -135,7 +135,7 @@ function M.new(opts)
         end)
     end
 
-    ---@param path string
+    ---@param path string|nil
     ---@return rexai.GitInfo|nil
     function object.get(_, path)
         return current(path)

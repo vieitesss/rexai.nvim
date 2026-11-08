@@ -30,11 +30,15 @@ local function reason(err)
     )
 end
 
+---@param method string
+---@param params table|nil
+---@return table
 local function call(method, params)
     local result, err = rex.call(method, params)
     if result == nil then
         fail(reason(err))
     end
+    ---@cast result table
     return result
 end
 
@@ -124,6 +128,7 @@ local view, view_err = rex.session.view({ session_id = session_id })
 if view == nil then
     fail(reason(view_err))
 end
+---@cast view table
 
 -- The Window is the first one of that Session labelled `dashboard`.
 local window

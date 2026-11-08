@@ -158,7 +158,7 @@ function M.new(opts)
             return float.enter()
         end
 
-        local block_id = target.block_id
+        local block_id = assert(target.block_id)
         peeks = peeks + 1
         local mine = peeks
 
@@ -261,7 +261,7 @@ function M.new(opts)
     -- number of this press. A cancelled prompt ends the flow silently; a press
     -- made after this one makes every continuation of this one return.
     ---@param what string 'Window' or 'Session'
-    ---@param prefill string
+    ---@param prefill string|nil directory the prompt starts at
     ---@param create fun(agent: string, dir: string, mine: integer)
     local function ask(what, prefill, create)
         adds = adds + 1

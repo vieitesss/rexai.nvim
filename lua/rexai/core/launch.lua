@@ -30,7 +30,7 @@ end
 -- gave when it is not empty, the last two directories otherwise.
 ---@param path string
 ---@param home string|nil
----@param custom string|nil what the hook returned
+---@param custom any what the hook returned
 ---@return string
 function M.session_label(path, home, custom)
     if type(custom) == 'string' and custom ~= '' then

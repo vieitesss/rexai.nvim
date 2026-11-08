@@ -17,9 +17,9 @@ M.NOW = 5
 -- Howard Hinnant's `days_from_civil`, which counts the era, the year in it and
 -- the day in it, so it needs no table of month lengths and no leap year rule
 -- of its own.
----@param year integer
----@param month integer
----@param day integer
+---@param year number
+---@param month number
+---@param day number
 ---@return integer
 local function days_from_civil(year, month, day)
     if month <= 2 then
@@ -73,8 +73,12 @@ local function epoch(text)
         return nil
     end
 
-    year, month, day = tonumber(year), tonumber(month), tonumber(day)
-    hour, minute, second = tonumber(hour), tonumber(minute), tonumber(second)
+    year, month, day =
+        assert(tonumber(year)), assert(tonumber(month)), assert(tonumber(day))
+    hour, minute, second =
+        assert(tonumber(hour)),
+        assert(tonumber(minute)),
+        assert(tonumber(second))
     if
         month < 1
         or month > 12
@@ -103,7 +107,7 @@ end
 -- time the process has not reached yet is `0s`. Anything unreadable is empty,
 -- so a row shows nothing rather than a wrong age.
 ---@param updated_at string|nil ISO 8601 time of the last status change
----@param now number epoch seconds
+---@param now number|nil epoch seconds
 ---@return string
 function M.format(updated_at, now)
     if type(now) ~= 'number' then
