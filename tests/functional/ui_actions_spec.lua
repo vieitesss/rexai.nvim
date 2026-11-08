@@ -763,6 +763,44 @@ describe('ui.actions', function()
                 assert.are.same({}, told.calls)
             end)
 
+            it('warns when no agent is configured', function()
+                config.setup({ agents = { commands = {} } })
+                target = ROW_IN_TREE
+
+                object:new_window()
+
+                assert.are.same({}, prompts.calls)
+                assert.are.same({}, backend.windows)
+                assert.are.equal(1, #told.calls)
+                assert.are.equal(
+                    'rexai: no agent is configured; set agents.commands '
+                        .. 'in setup()',
+                    told.calls[1].message
+                )
+                assert.are.equal(vim.log.levels.WARN, told.calls[1].level)
+            end)
+
+            it('drops a press answered after the list became empty', function()
+                target = ROW_IN_TREE
+
+                object:new_window()
+                config.setup({ agents = { commands = {} } })
+                object:new_window()
+
+                -- The select of the first press is still open; its answer,
+                -- arriving after the second press, creates nothing.
+                prompts.answer_select('pi')
+
+                assert.are.equal(1, #prompts.calls)
+                assert.are.equal(1, #told.calls)
+                assert.are.equal(
+                    'rexai: no agent is configured; set agents.commands '
+                        .. 'in setup()',
+                    told.calls[1].message
+                )
+                assert.are.same({}, backend.windows)
+            end)
+
             it(
                 'ends in silence when the directory prompt is cancelled',
                 function()
@@ -978,6 +1016,23 @@ describe('ui.actions', function()
                 assert.are.equal(1, #told.calls)
                 assert.are.equal(
                     'rexai: session_name failed: boom',
+                    told.calls[1].message
+                )
+                assert.are.equal(vim.log.levels.WARN, told.calls[1].level)
+            end)
+
+            it('warns when no agent is configured', function()
+                config.setup({ agents = { commands = {} } })
+
+                object:new_session()
+
+                assert.are.same({}, prompts.calls)
+                assert.are.same({}, backend.sessions)
+                assert.are.same({}, backend.windows)
+                assert.are.equal(1, #told.calls)
+                assert.are.equal(
+                    'rexai: no agent is configured; set agents.commands '
+                        .. 'in setup()',
                     told.calls[1].message
                 )
                 assert.are.equal(vim.log.levels.WARN, told.calls[1].level)

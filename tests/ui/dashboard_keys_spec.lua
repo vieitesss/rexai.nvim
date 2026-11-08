@@ -376,9 +376,11 @@ describe('ui.dashboard keys', function()
                 h:open({ snapshots = { TWO } })
 
                 local wanted = {
+                    q = 'Close the Dashboard',
                     ['<CR>'] = 'Go to the Agent block or Session',
                     r = 'Refresh the Dashboard',
                     e = 'Toggle the Exited rows',
+                    d = 'Review the Agent block',
                     K = 'Peek at the Agent block',
                     n = 'Add a Window to the Session',
                     N = 'Start a Session',

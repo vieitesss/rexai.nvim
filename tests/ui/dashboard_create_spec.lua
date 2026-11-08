@@ -488,6 +488,32 @@ describe('ui.dashboard create', function()
         end)
     end)
 
+    -- With no agent configured there is nothing to pick, so the key says so
+    -- and opens no prompt.
+    describe('with no configured agent', function()
+        it('warns and prompts for nothing', function()
+            config.setup({ agents = { commands = {} } })
+            local object = holding_backend(ONE)
+            h:open({ backend = object, home_session_id = HOME })
+            put_cursor_on_block('block:b1')
+
+            h:press('n')
+            h:press('N')
+
+            assert.are.same({}, h.prompt.calls)
+            assert.are.same({}, object.creates)
+            assert.are.equal(2, #h.notify.calls)
+            for _, call in ipairs(h.notify.calls) do
+                assert.are.equal(
+                    'rexai: no agent is configured; set agents.commands '
+                        .. 'in setup()',
+                    call.message
+                )
+                assert.are.equal(vim.log.levels.WARN, call.level)
+            end
+        end)
+    end)
+
     describe('a result that arrives too late', function()
         it(
             'creates nothing when the select is still open at the wipe',
