@@ -48,7 +48,7 @@ local state = {
     show_exited = nil,
     poller = nil,
     git = nil,
-    previous_buf = nil,
+    previous_buf = {},
     focused = true,
     saved = {},
     opening = false,
@@ -99,7 +99,7 @@ local function quit()
         return
     end
 
-    local previous = state.previous_buf
+    local previous = state.previous_buf[win]
     if previous and is_buffer(previous) and previous ~= state.buf then
         return vim.api.nvim_win_set_buf(win, previous)
     end
@@ -127,9 +127,11 @@ local function want_window_options(win)
     end
 end
 
--- Gives a window that leaves the Dashboard its own options back.
+-- Gives a window that leaves the Dashboard its own options back, and forgets
+-- the buffer it had before, so nothing outlives the visit.
 ---@param win integer
 local function restore_window_options(win)
+    state.previous_buf[win] = nil
     local saved = state.saved[win]
     if not saved then
         return
@@ -413,7 +415,7 @@ local function cleanup(group)
     state.lines, state.highlights, state.targets = nil, nil, {}
     state.data, state.show_exited = nil, nil
     state.hooks = nil
-    state.previous_buf = nil
+    state.previous_buf = {}
     state.focused = true
     state.saved = {}
     pcall(vim.api.nvim_del_augroup_by_id, group)
@@ -593,7 +595,7 @@ function M.open(opts)
     local before = vim.api.nvim_win_get_buf(win)
     state.opening = true
     if before ~= buf then
-        state.previous_buf = before
+        state.previous_buf[win] = before
         vim.api.nvim_win_set_buf(win, buf)
     end
     want_window_options(win)
