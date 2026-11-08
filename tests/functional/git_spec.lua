@@ -90,7 +90,7 @@ describe('git', function()
                 'status',
                 '--porcelain=v2',
                 '--branch',
-                '--untracked-files=normal',
+                '--untracked-files=all',
             }, status.argv)
             status.callback(nil, CLEAN)
 

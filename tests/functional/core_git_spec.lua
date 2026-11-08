@@ -97,6 +97,23 @@ describe('core.git', function()
                 },
             },
             {
+                name = 'two untracked files in one new directory',
+                text = table.concat({
+                    '# branch.oid 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b',
+                    '# branch.head main',
+                    '? newdir/notes.md',
+                    '? newdir/todo.md',
+                }, '\n'),
+                want = {
+                    branch = 'main',
+                    oid = '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b',
+                    detached = false,
+                    ahead = 0,
+                    behind = 0,
+                    changed = 2,
+                },
+            },
+            {
                 name = 'every kind of entry, with ignored files left out',
                 text = table.concat({
                     '# branch.oid 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b',
