@@ -1,9 +1,10 @@
 -- A stand-in for the `rex` command. Tests put it first on PATH, through the
 -- one-line `rex` wrapper that `tests/rex_stub.lua` writes. It never talks to a
 -- real Rex: it replays a prepared snapshot and answers the few commands the
--- rex Backend runs, plus the read-only ones `:checkhealth rexai` asks for
--- (`whoami`, `client ls`), which come from the `whoami` and `clients` keys of
--- the state.
+-- rex Backend runs, the read-only ones `:checkhealth rexai` and `just smoke`
+-- ask for (`whoami`, `client ls`, `ls`), which come from the `whoami`,
+-- `clients` and `sessions` keys of the state, and the `do home.lua` and `kill`
+-- of `just smoke`, from its `home` key and a record of the ids it removed.
 --
 --   nvim --headless --noplugin -u NONE -l tests/stub/rex.lua DIR ARGS...
 --
@@ -97,9 +98,34 @@ elseif command == 'client' and argv[2] == 'ls' then
     out({ clients = state.clients or {} })
 end
 
+-- The Sessions `just smoke` counts and the ids it removed. A killed Session
+-- stays out of `ls`, so a second count sees what a real Rex would show.
+if command == 'ls' then
+    local killed = {}
+    local file = io.open(dir .. '/killed.jsonl', 'r')
+    if file then
+        for line in file:lines() do
+            killed[vim.json.decode(line)] = true
+        end
+        file:close()
+    end
+    local sessions = {}
+    for _, session in ipairs(state.sessions or {}) do
+        if not killed[session.session_id] then
+            sessions[#sessions + 1] = session
+        end
+    end
+    out({ sessions = sessions })
+end
+
 if command == 'do' then
     local script = vim.fs.basename(argv[2])
-    if script == 'snapshot.lua' then
+    if script == 'home.lua' then
+        if state.home_fail then
+            die(1, 'stub: home script failed')
+        end
+        out(state.home or {})
+    elseif script == 'snapshot.lua' then
         out(state.snapshot)
     elseif script == 'focus.lua' then
         local target = vim.json.decode(option('--args'))
@@ -135,6 +161,14 @@ elseif command == 'new' then
             },
         },
     })
+elseif command == 'kill' then
+    if state.kill_fail then
+        die(1, 'stub: kill failed')
+    end
+    for i = 2, #argv do
+        write('killed.jsonl', vim.json.encode(argv[i]) .. '\n', 'a')
+    end
+    os.exit(0)
 elseif command == 'capture' then
     local target = { session_id = option('-s'), block_id = option('-b') }
     backend.peek(target, function(err, text)

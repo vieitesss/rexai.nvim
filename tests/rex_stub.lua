@@ -14,6 +14,10 @@ local M = {}
 ---@field stdout string|nil raw text every call prints instead of its answer
 ---@field whoami table|nil what the `whoami --json` of `:checkhealth rexai` prints
 ---@field clients table[]|nil what the `client ls --json` of `:checkhealth rexai` prints
+---@field sessions table[]|nil what `ls --json` lists; `kill` takes a Session out of it
+---@field home table|nil what `do home.lua` prints
+---@field home_fail boolean|nil `do home.lua` fails
+---@field kill_fail boolean|nil `kill` fails
 
 ---@class rexai.Stub
 ---@field dir string
