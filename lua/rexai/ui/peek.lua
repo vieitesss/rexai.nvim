@@ -1,6 +1,8 @@
 -- The float of the Dashboard: a hover-like window at the cursor with the lines
 -- it is given. One float at a time; it closes as soon as the cursor moves, the
--- Dashboard buffer is left or the user is done with it.
+-- Dashboard buffer is left or the user is done with it. A redraw that puts the
+-- cursor back where it was is no move: the float stays, and it follows the
+-- cursor when the Agent block or Session under it takes another line.
 --
 -- Only the window mechanics live here. The `K` key shows the lines `core.peek`
 -- builds, and `ui.actions` decides when; the `?` key shows the lines
@@ -20,6 +22,8 @@ M.COL = 0
 local state = {
     win = nil,
     buf = nil,
+    owner = nil,
+    cursor = nil,
     entering = false,
 }
 
@@ -28,11 +32,22 @@ function M.is_open()
     return state.win ~= nil and vim.api.nvim_win_is_valid(state.win)
 end
 
+-- The window the float hangs under, or nil when nothing is open. A redraw of
+-- the Dashboard asks, so the float of its window can follow it or close.
+---@return integer|nil
+function M.owner()
+    if not M.is_open() then
+        return nil
+    end
+    return state.owner
+end
+
 -- Closes the float and the buffer it showed. Safe to call when nothing is
 -- open, and from an autocmd of the float itself.
 function M.close()
     local win, buf = state.win, state.buf
-    state.win, state.buf, state.entering = nil, nil, false
+    state.win, state.buf, state.owner, state.cursor = nil, nil, nil, nil
+    state.entering = false
 
     pcall(vim.api.nvim_del_augroup_by_name, M.AUGROUP)
     if win and vim.api.nvim_win_is_valid(win) then
@@ -55,6 +70,33 @@ function M.enter()
     if not ok then
         M.close()
     end
+end
+
+-- Moves the float under the cursor of the window it hangs under, after a
+-- redraw put the cursor back on the same Agent block or Session on another
+-- line. The new spot is the one the plugin's own move made, not the user's.
+function M.reanchor()
+    if not M.is_open() then
+        return
+    end
+    -- The window it hangs under went away: nothing is left to follow.
+    if not vim.api.nvim_win_is_valid(state.owner) then
+        M.close()
+        return
+    end
+    local cursor = vim.api.nvim_win_get_cursor(state.owner)
+    vim.api.nvim_win_set_config(state.win, {
+        relative = 'win',
+        win = state.owner,
+        -- A buffer position of the owner, not the cursor: `relative =
+        -- 'cursor'` is resolved against the window the user is in, which is
+        -- not the owner once the float is entered or another Dashboard window
+        -- holds the cursor.
+        bufpos = { cursor[1] - 1, cursor[2] },
+        row = M.ROW,
+        col = M.COL,
+    })
+    state.cursor = cursor
 end
 
 -- `q` and `<Esc>` belong to a float the user is in.
@@ -90,7 +132,34 @@ local function autocmds(owner, buf)
     end
 
     local dashboard = vim.api.nvim_win_get_buf(owner)
-    on('CursorMoved', dashboard, M.close)
+    -- A redraw puts the cursor back where it was after it changed the buffer,
+    -- and Neovim reports that as a move. A move that ends where the float was
+    -- put is the plugin's own, so only any other move closes the float.
+    local function moved()
+        -- Closing the window the float hangs under happens before its
+        -- `WinClosed` callback, so a move that arrives first ends it here.
+        if not vim.api.nvim_win_is_valid(owner) then
+            M.close()
+            return
+        end
+        -- The Dashboard buffer may show in more than one window, and the
+        -- float hangs under one of them: a move in any other closes it.
+        if vim.api.nvim_get_current_win() ~= owner then
+            M.close()
+            return
+        end
+        if vim.deep_equal(vim.api.nvim_win_get_cursor(owner), state.cursor) then
+            return
+        end
+        M.close()
+    end
+    on('CursorMoved', dashboard, moved)
+    -- A window that goes away takes the float that hangs under it with it.
+    vim.api.nvim_create_autocmd('WinClosed', {
+        group = group,
+        pattern = tostring(owner),
+        callback = M.close,
+    })
     on('InsertEnter', dashboard, M.close)
     on('BufLeave', dashboard, function()
         -- Entering the float leaves the Dashboard buffer too.
@@ -155,7 +224,8 @@ function M.show(lines, win)
     end
     vim.api.nvim_set_option_value('wrap', false, { win = float_win })
 
-    state.win, state.buf = float_win, buf
+    state.win, state.buf, state.owner = float_win, buf, win
+    state.cursor = vim.api.nvim_win_get_cursor(win)
     keys(buf)
     autocmds(win, buf)
 end

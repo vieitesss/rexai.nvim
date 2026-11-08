@@ -589,6 +589,376 @@ describe('ui.dashboard peek', function()
         end)
     end)
 
+    describe('a refresh', function()
+        -- A copy of SNAPSHOT whose Window holds what `change` returns: the next
+        -- poll serves it instead, as a poll that brings new text would.
+        ---@param change fun(blocks: table[]): table[]
+        ---@return table
+        local function redrawn(change)
+            local copy = vim.deepcopy(SNAPSHOT)
+            local window = copy.sessions[1].windows[1]
+            window.blocks = change(window.blocks)
+            window.focused_block_id = window.blocks[1].id
+            return copy
+        end
+
+        -- Fires the poll that serves the second snapshot, then the
+        -- `CursorMoved` a real Neovim fires after the redraw put the cursor
+        -- back. A headless Neovim fires neither by itself.
+        local function poll()
+            h.timer.fire()
+            vim.api.nvim_exec_autocmds(
+                'CursorMoved',
+                { buffer = assert(h:buf()) }
+            )
+        end
+
+        -- Where the float hangs: the screen row of its top and its distance to
+        -- the cursor line, which says it is under it whatever the border.
+        ---@param win integer the window the float hangs under
+        ---@return integer row the top of the float, in screen rows
+        ---@return integer gap from the cursor line to that top
+        local function hang(win)
+            local float = assert(h:float())
+            local line = vim.api.nvim_win_get_cursor(win)[1]
+            local row = vim.api.nvim_win_get_position(float)[1]
+            return row, row - (vim.fn.screenpos(win, line, 1).row - 1)
+        end
+
+        it('keeps the float when only the text of a row changes', function()
+            h:open({
+                snapshots = {
+                    SNAPSHOT,
+                    redrawn(function(blocks)
+                        blocks[2].title = 'the parser, edited'
+                        return blocks
+                    end),
+                },
+                peek = { ['block:b2'] = SCREEN },
+                home_session_id = HOME,
+            })
+            put_cursor_on('block:b2')
+            h:press('K')
+            assert.is_not_nil(h:float())
+
+            poll()
+
+            assert.is_not_nil(h:float())
+        end)
+
+        it('moves the float under the cursor that follows its Block', function()
+            -- An Agent block below the cursor gains the status that ranks
+            -- first, so it moves above the cursor and the cursor follows its
+            -- own Agent block down.
+            local reordered = redrawn(function(blocks)
+                blocks[2].records[1].state = 'blocked'
+                return blocks
+            end)
+            h:open({
+                snapshots = { SNAPSHOT, reordered },
+                peek = { ['block:b1'] = SCREEN },
+                home_session_id = HOME,
+            })
+            put_cursor_on('block:b1')
+            h:press('K')
+            local row_before, gap_before = hang(0)
+
+            poll()
+
+            assert.is_not_nil(h:float())
+            assert.are.equal('block:b1', dashboard.current_target().block_id)
+            assert.are.equal(
+                support.line_of(targets_of(reordered), 'block:b1'),
+                vim.api.nvim_win_get_cursor(0)[1]
+            )
+            -- The float kept its distance to the cursor line and went down
+            -- with it, so it hangs under the new line.
+            local row_after, gap_after = hang(0)
+            assert.are.equal(gap_before, gap_after)
+            assert.is_true(row_after > row_before)
+        end)
+
+        it('closes the float when its Block leaves the snapshot', function()
+            h:open({
+                snapshots = {
+                    SNAPSHOT,
+                    redrawn(function(blocks)
+                        return { blocks[2] }
+                    end),
+                },
+                peek = { ['block:b1'] = SCREEN },
+                home_session_id = HOME,
+            })
+            put_cursor_on('block:b1')
+            h:press('K')
+            assert.is_not_nil(h:float())
+
+            -- The redraw alone closes it: the row it described is gone, and no
+            -- cursor move is needed to say so.
+            h.timer.fire()
+
+            assert.is_nil(h:float())
+            assert.are.equal(0, #support.floats())
+        end)
+
+        it('keeps a `?` help float over a line with no Agent block', function()
+            -- The first Session leaves the snapshot, so the buffer changes
+            -- and the cursor stays on line 3. That line has no Agent block,
+            -- so nothing it described is gone and the float stays.
+            local shorter = vim.deepcopy(TWO)
+            shorter.sessions = { shorter.sessions[2] }
+            h:open({ snapshots = { TWO, shorter }, home_session_id = HOME })
+            put_cursor_on_line(3)
+            assert.are.equal('', h:lines()[3])
+            h:press('?')
+            assert.is_not_nil(h:float())
+
+            poll()
+
+            assert.is_not_nil(h:float())
+        end)
+
+        -- A Backend that serves the frame the test has put in `frame`, so only
+        -- the poll the test fires brings the redraw, whatever else asks Rex.
+        ---@param first table
+        ---@return table
+        local function staged_backend(first)
+            local object = { frame = first }
+
+            function object.snapshot(callback)
+                callback(nil, object.frame)
+            end
+
+            function object.peek(_, callback)
+                callback(nil, SCREEN)
+            end
+
+            function object.focus(_, callback)
+                callback(nil)
+            end
+
+            function object.create_window(_, callback)
+                callback(nil)
+            end
+
+            function object.create_session(_, callback)
+                callback(nil)
+            end
+
+            return object
+        end
+
+        -- The next frame of SNAPSHOT: the title of `block:b2` changes, so the
+        -- text changes and the rows keep their places.
+        ---@return table
+        local function retitled()
+            return redrawn(function(blocks)
+                blocks[2].title = 'the parser, edited'
+                return blocks
+            end)
+        end
+
+        it('hangs under the owner window after the user entered it', function()
+            h:open({
+                snapshots = { SNAPSHOT, retitled() },
+                peek = { ['block:b2'] = SCREEN },
+                home_session_id = HOME,
+            })
+            put_cursor_on('block:b2')
+            h:press('K')
+            local win = assert(h:float())
+            h:press('K')
+            assert.are.equal(win, vim.api.nvim_get_current_win())
+            local before = vim.api.nvim_win_get_position(win)
+
+            -- The user scrolls the float, then a poll changes a title.
+            vim.api.nvim_win_set_cursor(win, { 4, 0 })
+            h.timer.fire()
+
+            local after_win = assert(h:float())
+            local after = vim.api.nvim_win_get_position(after_win)
+            assert.are.same(before, after)
+        end)
+
+        it(
+            'hangs under the owner window when another window is current',
+            function()
+                local backend = staged_backend(SNAPSHOT)
+                h:open({ backend = backend, home_session_id = HOME })
+                local other = vim.api.nvim_get_current_win()
+                put_cursor_on('block:b2')
+                vim.cmd('vsplit')
+                put_cursor_on('block:b2')
+                vim.api.nvim_win_set_cursor(other, { 1, 0 })
+                h:press('K')
+                local float = assert(h:float())
+                local before = vim.api.nvim_win_get_position(float)
+
+                vim.api.nvim_set_current_win(other)
+                backend.frame = retitled()
+                h.timer.fire()
+
+                local after_float = assert(h:float())
+                assert.are.same(
+                    before,
+                    vim.api.nvim_win_get_position(after_float)
+                )
+            end
+        )
+
+        it('closes the float when the owner window is closed', function()
+            h:open({
+                snapshots = { SNAPSHOT },
+                peek = { ['block:b1'] = SCREEN },
+                home_session_id = HOME,
+            })
+            -- A second window shows the same Dashboard, and the float hangs
+            -- under that one.
+            vim.cmd('vsplit')
+            local owner = vim.api.nvim_get_current_win()
+            put_cursor_on('block:b1')
+            h:press('K')
+            assert.is_not_nil(h:float())
+
+            vim.api.nvim_win_close(owner, true)
+
+            assert.is_nil(h:float())
+            -- The Dashboard of the other window still answers a move.
+            vim.api.nvim_exec_autocmds(
+                'CursorMoved',
+                { buffer = assert(h:buf()) }
+            )
+            assert.is_nil(h:float())
+        end)
+
+        it(
+            'closes the float when the user moves in another Dashboard window',
+            function()
+                h:open({
+                    snapshots = { SNAPSHOT },
+                    peek = { ['block:b1'] = SCREEN },
+                    home_session_id = HOME,
+                })
+                local other = vim.api.nvim_get_current_win()
+                -- The float hangs under the new window, whose cursor stays on
+                -- the Agent block through every move below.
+                vim.cmd('vsplit')
+                put_cursor_on('block:b1')
+                vim.api.nvim_win_set_cursor(other, { 3, 0 })
+                h:press('K')
+                assert.is_not_nil(h:float())
+
+                vim.api.nvim_set_current_win(other)
+                vim.api.nvim_win_set_cursor(other, { 1, 0 })
+                vim.api.nvim_exec_autocmds(
+                    'CursorMoved',
+                    { buffer = assert(h:buf()) }
+                )
+
+                assert.is_nil(h:float())
+            end
+        )
+
+        -- One Session, one Window, one Agent block: the smallest Dashboard
+        -- that shows a single row under its Session header.
+        ---@param session_id string
+        ---@param block_id string
+        ---@return table
+        local function one_row(session_id, block_id)
+            return snap.snapshot({
+                snap.session({
+                    id = session_id,
+                    label = 'orbit',
+                    windows = {
+                        snap.window({
+                            id = 'window:w1',
+                            label = 'api',
+                            blocks = {
+                                snap.block({
+                                    id = block_id,
+                                    app = 'pi',
+                                    state = 'working',
+                                    title = 'the parser',
+                                    cwd = '/work/orbit',
+                                    updated_at = '2026-11-07T16:10:00Z',
+                                }),
+                            },
+                        }),
+                    },
+                }),
+            })
+        end
+
+        it('closes the float of a Block an identical frame replaces', function()
+            local backend = staged_backend(one_row('session:s1', 'block:old'))
+            h:open({ backend = backend, home_session_id = HOME })
+            put_cursor_on_line(2)
+            assert.are.equal('block:old', dashboard.current_target().block_id)
+            h:press('K')
+            assert.is_not_nil(h:float())
+
+            -- The same text, another Block: only the target says the row the
+            -- float described is gone.
+            backend.frame = one_row('session:s1', 'block:new')
+            h.timer.fire()
+
+            assert.are.equal('block:new', dashboard.current_target().block_id)
+            assert.is_nil(h:float())
+        end)
+
+        it(
+            'closes a `?` float of a Session an identical frame replaces',
+            function()
+                local backend =
+                    staged_backend(one_row('session:s1', 'block:b1'))
+                h:open({ backend = backend, home_session_id = HOME })
+                put_cursor_on_line(1)
+                assert.are.equal(
+                    'session:s1',
+                    dashboard.current_target().session_id
+                )
+                h:press('?')
+                assert.is_not_nil(h:float())
+
+                backend.frame = one_row('session:new', 'block:b1')
+                h.timer.fire()
+
+                assert.are.equal(
+                    'session:new',
+                    dashboard.current_target().session_id
+                )
+                assert.is_nil(h:float())
+            end
+        )
+
+        it('closes the float when the user moves after a redraw', function()
+            h:open({
+                snapshots = {
+                    SNAPSHOT,
+                    redrawn(function(blocks)
+                        blocks[2].title = 'the parser, edited'
+                        return blocks
+                    end),
+                },
+                peek = { ['block:b2'] = SCREEN },
+                home_session_id = HOME,
+            })
+            put_cursor_on('block:b2')
+            h:press('K')
+            poll()
+            assert.is_not_nil(h:float())
+
+            -- A redraw leaves the float open, a move by the user never does.
+            put_cursor_on('block:b1')
+            vim.api.nvim_exec_autocmds(
+                'CursorMoved',
+                { buffer = assert(h:buf()) }
+            )
+
+            assert.is_nil(h:float())
+        end)
+    end)
+
     describe('wiping the Dashboard', function()
         it('closes the float it left open', function()
             local wins, bufs =

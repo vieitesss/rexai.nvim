@@ -180,15 +180,57 @@ local function cursors()
     return out
 end
 
+-- The line each Agent block or Session of a frame is on, by the key the
+-- cursor of a window remembers.
+---@param targets table<integer, rexai.RenderTarget>
+---@return table<string, integer>
+local function target_lines(targets)
+    local lines = {}
+    for line, target in pairs(targets) do
+        lines[target_key(target)] = line
+    end
+    return lines
+end
+
+-- The windows whose Agent block or Session is not in `lines`: the row they
+-- show is gone. A line with no target has no key, so it is never lost.
+---@param saved rexai.Cursor[]
+---@param lines table<string, integer>
+---@return integer[]
+local function lost_windows(saved, lines)
+    local lost = {}
+    for _, cursor in ipairs(saved) do
+        if
+            cursor.key
+            and not lines[cursor.key]
+            and vim.api.nvim_win_is_valid(cursor.win)
+        then
+            lost[#lost + 1] = cursor.win
+        end
+    end
+    return lost
+end
+
+-- A float open on this Dashboard follows the cursor its Agent block or Session
+-- just moved to, and closes when that row is gone: a redraw is no cursor move
+-- by the user.
+---@param lost integer[]
+local function settle_float(lost)
+    if vim.tbl_contains(lost, float.owner()) then
+        float.close()
+    else
+        float.reanchor()
+    end
+end
+
 -- Puts each window back on the line of the same Agent block or Session, or on
 -- the same line number clamped to the new buffer when that line is gone.
 ---@param saved rexai.Cursor[]
 ---@param out rexai.Render
+---@return integer[] lost the windows whose Agent block or Session is gone
 local function restore_cursors(saved, out)
-    local lines = {}
-    for line, target in pairs(out.targets) do
-        lines[target_key(target)] = line
-    end
+    local lines = target_lines(out.targets)
+    local lost = lost_windows(saved, lines)
 
     for _, cursor in ipairs(saved) do
         if vim.api.nvim_win_is_valid(cursor.win) then
@@ -203,6 +245,7 @@ local function restore_cursors(saved, out)
             })
         end
     end
+    return lost
 end
 
 ---@param out rexai.Render
@@ -216,12 +259,18 @@ local function show(out)
     -- The targets of every frame are published, even when the text and the
     -- highlights are the same: Rex may replace a Block, Window or Session with
     -- one of another id under the same text, and the keys must act on the id
-    -- the model just accepted. The assignment comes after `cursors`, which
-    -- reads the targets of the frame the windows still show.
+    -- the model just accepted. `cursors` reads the targets of the frame the
+    -- windows still show, so it runs before this assignment in both branches.
     local unchanged = vim.deep_equal(state.lines, out.lines)
         and vim.deep_equal(state.highlights, out.highlights)
     if unchanged then
+        -- The text stays, but a row may hold another Block, Window or Session,
+        -- so the saved cursors are compared with this frame too. No cursor
+        -- moves here.
+        local saved = cursors()
+        local lost = lost_windows(saved, target_lines(out.targets))
         state.targets = out.targets
+        settle_float(lost)
         return
     end
 
@@ -241,8 +290,9 @@ local function show(out)
 
     state.lines = out.lines
     state.highlights = out.highlights
-    restore_cursors(saved, out)
+    local lost = restore_cursors(saved, out)
     state.targets = out.targets
+    settle_float(lost)
 end
 
 -- The git slot of every row the render will show, by Block id, and the paths
