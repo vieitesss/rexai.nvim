@@ -76,7 +76,7 @@ local function resolve(opts)
 end
 
 -- Control characters become a space and runs of whitespace become one, so a
--- Window label or a terminal title can never break a line.
+-- Window label or a Block title can never break a line.
 ---@param text string|nil
 ---@return string
 local function one_line(text)
@@ -118,18 +118,6 @@ local function truncate(text, cells)
         used = used + char_width
     end
     return table.concat(out) .. M.ELLIPSIS
-end
-
--- The Agent status as a row shows it. An exited agent adds the exit code Rex
--- gave it, zero included.
----@param row rexai.Row
----@return string
-local function state_of(row)
-    local text = (row.status or ''):gsub('_', ' ')
-    if row.status == 'exited' and row.exit_code ~= nil then
-        text = text .. ' ' .. tostring(row.exit_code)
-    end
-    return text
 end
 
 local Builder = {}
@@ -260,7 +248,7 @@ end
 ---@field label string
 ---@field git string
 ---@field title string
----@field state string
+---@field status string
 ---@field age string
 
 ---@param rows rexai.Row[]
@@ -269,12 +257,13 @@ end
 local function cells_of(rows, opts)
     local out = {}
     for index, row in ipairs(rows) do
+        local status_text = status.text(row)
         out[index] = {
             row = row,
             label = one_line(row.label),
             git = one_line(opts.git[row.block_id]),
             title = truncate(one_line(row.title), opts.title_width),
-            state = state_of(row),
+            status = status_text,
             age = age.format(row.updated_at, opts.now),
         }
     end
@@ -317,7 +306,7 @@ function M.build(sessions, opts)
 
     -- Every column is as wide as its widest value over all rows, so the
     -- columns line up across Sessions.
-    local columns = { label = 0, git = 0, title = 0, state = 0 }
+    local columns = { label = 0, git = 0, title = 0, status = 0 }
     local prepared = {}
     for index, session in ipairs(listed(sessions, o)) do
         local cells = cells_of(rows_of(session, o.show_exited), o)
@@ -326,7 +315,7 @@ function M.build(sessions, opts)
             columns.label = math.max(columns.label, width(cell.label))
             columns.git = math.max(columns.git, width(cell.git))
             columns.title = math.max(columns.title, width(cell.title))
-            columns.state = math.max(columns.state, width(cell.state))
+            columns.status = math.max(columns.status, width(cell.status))
         end
     end
 
@@ -377,7 +366,7 @@ function M.build(sessions, opts)
             end
             line:cell(cell.title, columns.title, 'RexaiDim')
             line:raw('  ')
-            line:cell(cell.state, columns.state, group)
+            line:cell(cell.status, columns.status, group)
             line:raw(' ')
             line:text(cell.age)
 

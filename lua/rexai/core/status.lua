@@ -87,4 +87,16 @@ function M.rollup(names)
     return best
 end
 
+-- The Agent status as the Dashboard writes it. An exited agent adds the exit
+-- code Rex gave it, zero included.
+---@param row { status: string|nil, exit_code: integer|nil }
+---@return string
+function M.text(row)
+    local text = (row.status or ''):gsub('_', ' ')
+    if row.status == 'exited' and row.exit_code ~= nil then
+        text = text .. ' ' .. tostring(row.exit_code)
+    end
+    return text
+end
+
 return M

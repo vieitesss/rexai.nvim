@@ -4,6 +4,8 @@
 -- This module is pure. It touches neither Neovim nor Rex, so it runs in
 -- Neovim's LuaJIT and in Rex's Lua 5.1.
 
+local status = require('rexai.core.status')
+
 local M = {}
 
 -- Between the parts of the header.
@@ -59,18 +61,6 @@ local function characters(text)
     return total
 end
 
--- The Agent status as the Dashboard writes it. An exited agent adds the exit
--- code Rex gave it, zero included.
----@param row rexai.Row
----@return string
-local function state_of(row)
-    local text = (row.status or ''):gsub('_', ' ')
-    if row.status == 'exited' and row.exit_code ~= nil then
-        text = text .. ' ' .. tostring(row.exit_code)
-    end
-    return text
-end
-
 -- The lines of the Block's screen. The newline `rex capture` ends its output
 -- with, and any blank line after it, add no line to the float.
 ---@param screen string|nil
@@ -117,7 +107,7 @@ function M.lines(opts)
     local header = {}
     add(header, row.label)
     add(header, row.harness)
-    add(header, state_of(row))
+    add(header, status.text(row))
 
     local out = { table.concat(header, M.SEPARATOR) }
     add(out, row.msg)
