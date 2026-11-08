@@ -341,9 +341,10 @@ colorscheme that styles those restyles the Dashboard too.
 ==============================================================================
 11. LIMITS                                                      *rexai-limits*
 
-- Rex clears the `done` Agent status once you view its Block. The plugin shows
-  the status Rex reports and never changes it, so the row shows the new status
-  on the next refresh.
+- Rex keeps the `done` Agent status after you view its Block, until the agent
+  reports a new one. Rex reports no viewed or seen state, so the Dashboard
+  cannot tell a reviewed done row from an unseen one. The plugin shows the
+  status Rex reports and never changes it.
 - The Dashboard knows only what Rex reports. An agent that reports nothing
   shows as unreported. An agent that no agents.apps or agents.commands
   entry matches is not listed.
