@@ -127,7 +127,7 @@ describe('ui.dashboard hooks', function()
             assert.are.equal(2, #h.git.calls)
         end)
 
-        it('runs once per row and snapshot, and not again on e', function()
+        it('runs once per row and snapshot, and not again on x', function()
             local seen = {}
             config.setup({
                 resolve_path = function(block)
