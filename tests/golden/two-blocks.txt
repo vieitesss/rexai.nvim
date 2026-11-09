@@ -1,3 +1,5 @@
 ! orbit
-  ! needs input  waiting on the schema change  release claude-code  now
-  * working      writing the migration         release pi           1h
+  ! needs input  waiting on the schema change
+                 release claude-code  now
+  * working      writing the migration
+                 release pi           1h

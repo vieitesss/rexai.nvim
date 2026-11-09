@@ -66,14 +66,18 @@ end
 
 ---@param targets table<integer, rexai.RenderTarget>
 ---@param block_id string
----@return integer the line that Agent block is on
+---@return integer the first line that Agent block takes
 function M.line_of(targets, block_id)
+    local found
     for line, target in pairs(targets) do
-        if target.block_id == block_id then
-            return line
+        if target.block_id == block_id and (not found or line < found) then
+            found = line
         end
     end
-    error('no line for ' .. block_id)
+    if not found then
+        error('no line for ' .. block_id)
+    end
+    return found
 end
 
 -- Lets every callback `vim.schedule` queued run.

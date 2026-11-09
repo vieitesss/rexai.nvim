@@ -68,7 +68,7 @@ describe('ui.dashboard identity', function()
 
         h.timer.fire()
 
-        assert.are.equal(2, #before)
+        assert.are.equal(3, #before)
         assert.are.same(before, h:lines())
         return win, calls, function()
             return changes

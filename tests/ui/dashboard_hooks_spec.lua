@@ -389,8 +389,9 @@ describe('ui.dashboard hooks', function()
                     'rexai: review failed: boom',
                     h.notify.calls[1].message
                 )
-                -- The Session header, the row, and the Home session header.
-                assert.are.equal(4, #h:lines())
+                -- The Session header, the two lines of the row, and the Home
+                -- session header.
+                assert.are.equal(5, #h:lines())
 
                 -- `r` still asks Rex, so the Dashboard is not stuck.
                 h:press('r')

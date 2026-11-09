@@ -1,3 +1,5 @@
 + orbit
-  + done     the docs                 api claude-code  15m
-  * working  the parser again  2+ 1-  api pi           1m
+  + done     the docs
+                    api claude-code  15m
+  * working  the parser again
+             2+ 1-  api pi           1m

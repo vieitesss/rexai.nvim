@@ -137,9 +137,9 @@ describe('ui.dashboard keys', function()
         it('does nothing on a line with no target', function()
             local _, calls = h:open({ snapshots = { TWO, EMPTY } })
             local win = vim.api.nvim_get_current_win()
-            -- Line 3 is the blank line between the two Sessions.
-            vim.api.nvim_win_set_cursor(win, { 3, 0 })
-            assert.are.equal('', h:lines()[3])
+            -- Line 4 is the blank line between the two Sessions.
+            vim.api.nvim_win_set_cursor(win, { 4, 0 })
+            assert.are.equal('', h:lines()[4])
 
             h:press('<CR>')
 
@@ -261,17 +261,17 @@ describe('ui.dashboard keys', function()
                     ending({ first = 'block:k8', second = 'block:k9' })
                 local _, calls = h:open({ snapshots = { live, gone } })
                 h.timer.fire()
-                assert.are.equal(3, #h:lines())
-                assert.are.equal(2, support.count(calls, 'snapshot'))
-
-                h:press('x')
-
-                assert.are.equal(2, #h:lines())
+                assert.are.equal(5, #h:lines())
                 assert.are.equal(2, support.count(calls, 'snapshot'))
 
                 h:press('x')
 
                 assert.are.equal(3, #h:lines())
+                assert.are.equal(2, support.count(calls, 'snapshot'))
+
+                h:press('x')
+
+                assert.are.equal(5, #h:lines())
                 assert.are.equal(2, support.count(calls, 'snapshot'))
             end
         )
@@ -341,12 +341,12 @@ describe('ui.dashboard keys', function()
             })
             h.timer.fire()
             local win = vim.api.nvim_get_current_win()
-            vim.api.nvim_win_set_cursor(win, { 6, 0 })
+            vim.api.nvim_win_set_cursor(win, { 8, 0 })
             assert.are.equal('block:e2', dashboard.current_target(win).block_id)
 
             h:press('x')
 
-            assert.are.equal(5, vim.api.nvim_win_get_cursor(win)[1])
+            assert.are.equal(6, vim.api.nvim_win_get_cursor(win)[1])
             assert.are.equal('block:e2', dashboard.current_target(win).block_id)
         end)
 
@@ -359,11 +359,11 @@ describe('ui.dashboard keys', function()
 
             -- `block:k4` exited and is hidden, so only its Session and the
             -- live Block show.
-            assert.are.equal(2, #h:lines())
+            assert.are.equal(3, #h:lines())
 
             h:press('x')
 
-            assert.are.equal(3, #h:lines())
+            assert.are.equal(5, #h:lines())
             -- The key is Dashboard state: the config keeps its value.
             assert.is_false(config.get().show_exited)
         end)

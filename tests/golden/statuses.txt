@@ -1,17 +1,23 @@
 ! session-3
-  ! needs input  work on review        review        now
+  ! needs input  work on review
+                 review        now
 
 x session-4
-  x error        work on broken-build  broken-build  42s
+  x error        work on broken-build
+                 broken-build  42s
 
 + session-1
-  + done         work on docs          docs          3m
+  + done         work on docs
+                 docs          3m
 
 * session-6
-  * working      work on refactor      refactor      1h
+  * working      work on refactor
+                 refactor      1h
 
 ? session-5
-  ? unreported   work on quiet-app     quiet-app
+  ? unreported   work on quiet-app
+                 quiet-app
 
 - session-2
-  - idle         work on idle-app      idle-app      4d
+  - idle         work on idle-app
+                 idle-app      4d

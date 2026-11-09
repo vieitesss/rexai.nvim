@@ -1,5 +1,7 @@
 x orbit
-  x error    a failing test        api        now
+  x error    a failing test
+             api        now
 
 * home (home)
-  * working  the dashboard itself  dashboard  1m
+  * working  the dashboard itself
+             dashboard  1m

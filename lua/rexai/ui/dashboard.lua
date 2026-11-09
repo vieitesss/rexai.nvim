@@ -148,13 +148,14 @@ local function restore_window_options(win)
     end
 end
 
--- What the cursor of a window is on: the line, the column and the Agent block
--- or Session the line shows.
+-- What the cursor of a window is on: the line, the column, the Agent block or
+-- Session the line shows, and how far into that target's lines it sits.
 ---@class rexai.Cursor
 ---@field win integer
 ---@field line integer
 ---@field col integer
 ---@field key string|nil
+---@field offset integer how many lines below the first line of the target
 
 ---@param target rexai.RenderTarget|nil
 ---@return string|nil
@@ -168,39 +169,58 @@ local function target_key(target)
     return 'row:' .. tostring(target.block_id)
 end
 
+-- The lines a target of a frame takes. A row takes two, so its first and last
+-- line are both kept: the cursor goes back on the same one.
+---@class rexai.TargetLines
+---@field first integer
+---@field last integer
+
+-- The lines each Agent block or Session of a frame takes, by the key the
+-- cursor of a window remembers.
+---@param targets table<integer, rexai.RenderTarget>
+---@return table<string, rexai.TargetLines>
+local function target_lines(targets)
+    local lines = {}
+    for line, target in pairs(targets) do
+        local key = target_key(target)
+        if key then
+            local span = lines[key]
+            if not span then
+                lines[key] = { first = line, last = line }
+            else
+                span.first = math.min(span.first, line)
+                span.last = math.max(span.last, line)
+            end
+        end
+    end
+    return lines
+end
+
 ---@return rexai.Cursor[]
 local function cursors()
+    local lines = target_lines(state.targets)
     local out = {}
     for _, win in ipairs(windows()) do
         if vim.api.nvim_win_is_valid(win) then
             local pos = vim.api.nvim_win_get_cursor(win)
+            local key = target_key(state.targets[pos[1]])
+            local span = key and lines[key]
             out[#out + 1] = {
                 win = win,
                 line = pos[1],
                 col = pos[2],
-                key = target_key(state.targets[pos[1]]),
+                key = key,
+                offset = span and (pos[1] - span.first) or 0,
             }
         end
     end
     return out
 end
 
--- The line each Agent block or Session of a frame is on, by the key the
--- cursor of a window remembers.
----@param targets table<integer, rexai.RenderTarget>
----@return table<string, integer>
-local function target_lines(targets)
-    local lines = {}
-    for line, target in pairs(targets) do
-        lines[target_key(target)] = line
-    end
-    return lines
-end
-
 -- The windows whose Agent block or Session is not in `lines`: the row they
 -- show is gone. A line with no target has no key, so it is never lost.
 ---@param saved rexai.Cursor[]
----@param lines table<string, integer>
+---@param lines table<string, rexai.TargetLines>
 ---@return integer[]
 local function lost_windows(saved, lines)
     local lost = {}
@@ -228,8 +248,8 @@ local function settle_float(lost)
     end
 end
 
--- Puts each window back on the line of the same Agent block or Session, or on
--- the same line number clamped to the new buffer when that line is gone.
+-- Puts each window back on the same line of the same Agent block or Session,
+-- or on the same line number clamped to the new buffer when that line is gone.
 ---@param saved rexai.Cursor[]
 ---@param out rexai.Render
 ---@return integer[] lost the windows whose Agent block or Session is gone
@@ -239,8 +259,11 @@ local function restore_cursors(saved, out)
 
     for _, cursor in ipairs(saved) do
         if vim.api.nvim_win_is_valid(cursor.win) then
-            local line = cursor.key and lines[cursor.key]
-            if not line then
+            local line
+            local span = cursor.key and lines[cursor.key]
+            if span then
+                line = math.min(span.first + cursor.offset, span.last)
+            else
                 line = math.min(cursor.line, #out.lines)
             end
             local text = out.lines[line] or ''

@@ -306,7 +306,7 @@ function M.build(sessions, opts)
 
     -- Every column is as wide as its widest value over all rows, so the
     -- columns line up across Sessions.
-    local columns = { label = 0, git = 0, title = 0, status = 0 }
+    local columns = { label = 0, git = 0, status = 0 }
     local prepared = {}
     for index, session in ipairs(listed(sessions, o)) do
         local cells = cells_of(rows_of(session, o.show_exited), o)
@@ -314,10 +314,13 @@ function M.build(sessions, opts)
         for _, cell in ipairs(cells) do
             columns.label = math.max(columns.label, width(cell.label))
             columns.git = math.max(columns.git, width(cell.git))
-            columns.title = math.max(columns.title, width(cell.title))
             columns.status = math.max(columns.status, width(cell.status))
         end
     end
+
+    -- The display column a row's title starts on: the indent, the glyph, its
+    -- space, the status column and the two spaces after it.
+    local title_col = 2 + glyph_width + 1 + columns.status + 2
 
     for index, entry in ipairs(prepared) do
         local session = entry.session
@@ -354,30 +357,38 @@ function M.build(sessions, opts)
         for _, cell in ipairs(entry.cells) do
             local row = cell.row
             local group = highlights.group(row.status)
-            local line = builder()
-            line:raw('  ')
-            line:cell(o.glyphs[row.status] or '', glyph_width, group)
-            line:raw(' ')
-            -- The most important column comes first: status, title, git,
-            -- label, then the age.
-            line:cell(cell.status, columns.status, group)
-            line:raw('  ')
-            line:cell(cell.title, columns.title, 'RexaiDim')
-            line:raw('  ')
-            if columns.git > 0 then
-                line:cell(cell.git, columns.git)
-                line:raw('  ')
-            end
-            line:cell(cell.label, columns.label)
-            line:raw('  ')
-            line:text(cell.age)
-
-            out.targets[push(line:line(), line.spans)] = {
+            local target = {
                 kind = 'row',
                 session_id = row.session_id,
                 window_id = row.window_id,
                 block_id = row.block_id,
             }
+
+            -- The most important columns come first: the glyph, the status and
+            -- then the title.
+            local head = builder()
+            head:raw('  ')
+            head:cell(o.glyphs[row.status] or '', glyph_width, group)
+            head:raw(' ')
+            head:cell(cell.status, columns.status, group)
+            head:raw('  ')
+            head:text(cell.title, 'RexaiDim')
+            out.targets[push(head:line(), head.spans)] = target
+
+            -- The rest of the row goes under the title, at the column the
+            -- title starts on, so a narrow window still shows it: git, label,
+            -- then the age. Both lines carry the target of the row, so a key
+            -- acts on it from either one.
+            local tail = builder()
+            tail:raw(string.rep(' ', title_col))
+            if columns.git > 0 then
+                tail:cell(cell.git, columns.git)
+                tail:raw('  ')
+            end
+            tail:cell(cell.label, columns.label)
+            tail:raw('  ')
+            tail:text(cell.age)
+            out.targets[push(tail:line(), tail.spans)] = target
         end
     end
 

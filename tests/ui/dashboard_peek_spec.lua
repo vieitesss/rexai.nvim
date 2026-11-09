@@ -484,9 +484,9 @@ describe('ui.dashboard peek', function()
                 snapshots = { TWO },
                 home_session_id = HOME,
             })
-            -- Line 3 is the blank line between the two Sessions.
-            put_cursor_on_line(3)
-            assert.are.equal('', h:lines()[3])
+            -- Line 4 is the blank line between the two Sessions.
+            put_cursor_on_line(4)
+            assert.are.equal('', h:lines()[4])
 
             h:press('K')
 
@@ -678,6 +678,37 @@ describe('ui.dashboard peek', function()
             assert.is_true(row_after > row_before)
         end)
 
+        it('keeps the float under the second line of a row', function()
+            local reordered = redrawn(function(blocks)
+                blocks[2].records[1].state = 'blocked'
+                return blocks
+            end)
+            h:open({
+                snapshots = { SNAPSHOT, reordered },
+                peek = { ['block:b1'] = SCREEN },
+                home_session_id = HOME,
+            })
+            put_cursor_on_line(
+                support.line_of(targets_of(SNAPSHOT), 'block:b1') + 1
+            )
+            h:press('K')
+            local row_before, gap_before = hang(0)
+            -- The second line of the row holds the label and the age, and
+            -- still names the Agent block.
+            assert.are.equal('block:b1', dashboard.current_target().block_id)
+
+            poll()
+
+            assert.is_not_nil(h:float())
+            assert.are.equal(
+                support.line_of(targets_of(reordered), 'block:b1') + 1,
+                vim.api.nvim_win_get_cursor(0)[1]
+            )
+            local row_after, gap_after = hang(0)
+            assert.are.equal(gap_before, gap_after)
+            assert.is_true(row_after > row_before)
+        end)
+
         it('closes the float when its Block leaves the snapshot', function()
             h:open({
                 snapshots = {
@@ -702,14 +733,15 @@ describe('ui.dashboard peek', function()
         end)
 
         it('keeps a `g?` help float over a line with no Agent block', function()
-            -- The first Session leaves the snapshot, so the buffer changes
-            -- and the cursor stays on line 3. That line has no Agent block,
-            -- so nothing it described is gone and the float stays.
-            local shorter = vim.deepcopy(TWO)
-            shorter.sessions = { shorter.sessions[2] }
-            h:open({ snapshots = { TWO, shorter }, home_session_id = HOME })
-            put_cursor_on_line(3)
-            assert.are.equal('', h:lines()[3])
+            -- A row takes another title, so the buffer changes and the cursor
+            -- stays on the blank line between the Sessions. That line has no
+            -- Agent block, so nothing it described is gone and the float
+            -- stays.
+            local retitled = vim.deepcopy(TWO)
+            retitled.sessions[2].windows[1].blocks[1].title = 'the schema'
+            h:open({ snapshots = { TWO, retitled }, home_session_id = HOME })
+            put_cursor_on_line(4)
+            assert.are.equal('', h:lines()[4])
             h:press('g?')
             assert.is_not_nil(h:float())
 

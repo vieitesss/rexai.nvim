@@ -34,18 +34,25 @@ Run `:Rexai`. The Dashboard is a buffer in the current window, and `q` gives tha
 
 ```
 ! api
-  ! needs input  add the migration      claude-code 4d5e  1m
-  x error        fix the failing test   pi 7a8b           4m
-  + done         write the parser docs  claude-code 0b1c  14m
-  ? unreported   look at the logs       opencode 6b7c
-  - idle         waiting for review     pi 9e0f           2h
-  . exited 1     port the old script    pi 2b3c           9m
+  ! needs input  add the migration
+                 claude-code 4d5e  1m
+  x error        fix the failing test
+                 pi 7a8b           4m
+  + done         write the parser docs
+                 claude-code 0b1c  14m
+  ? unreported   look at the logs
+                 opencode 6b7c
+  - idle         waiting for review
+                 pi 9e0f           2h
+  . exited 1     port the old script
+                 pi 2b3c           9m
 
 * my-project (home)
-  * working      refactor the parser    pi 1b2c           45s
+  * working      refactor the parser
+                 pi 1b2c           45s
 ```
 
-The sample is a real render of invented names. A Session header shows the highest Agent status among its rows. When git works in a row's directory, a git column shows `repo · branch ↑ahead ↓behind ●changed`, leaving out zero counts. A row with no git result leaves that column blank.
+The sample is a real render of invented names. A row takes two lines: the glyph, the Agent status and the title on the first, and the git column, the label and the age on the second, under the title. A Session header shows the highest Agent status among its rows. When git works in a row's directory, a git column shows `repo · branch ↑ahead ↓behind ●changed`, leaving out zero counts. A row with no git result leaves that column blank.
 
 Sourcing a session that holds the Dashboard, as `:restart` does, gives the Dashboard back in every window that showed it, with its keys and its refresh.
 

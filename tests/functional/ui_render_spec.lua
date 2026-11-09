@@ -96,13 +96,19 @@ end
 
 ---@param out rexai.Render
 ---@param kind string
----@return rexai.RenderTarget[] in line order
+---@return rexai.RenderTarget[] in line order, once per Session or row
 local function targets_of(out, kind)
     local list = {}
+    local previous = nil
     for line = 1, #out.lines do
         local target = out.targets[line]
         if target and target.kind == kind then
-            list[#list + 1] = target
+            -- A row takes two lines and both carry the same target, so one
+            -- table is listed once.
+            if target ~= previous then
+                list[#list + 1] = target
+            end
+            previous = target
         end
     end
     return list
@@ -191,11 +197,43 @@ describe('ui.render', function()
                 config.defaults.agents
             )
             local out = build(sessions)
-            assert.are.equal(2, #out.lines)
+            assert.are.equal(3, #out.lines)
             assert.are.equal('* session', out.lines[1])
-            assert.is_truthy(out.lines[2]:find('api', 1, true))
+            assert.are.equal('  * working  chasing a bug', out.lines[2])
+            assert.is_truthy(out.lines[3]:find('api', 1, true))
             assert.are.equal('row', out.targets[2].kind)
             assert.are.equal('block:b1', out.targets[2].block_id)
+        end)
+
+        it('gives a row two lines, the second under the title', function()
+            local sessions = {
+                session({
+                    rows = {
+                        row({
+                            block_id = 'block:a',
+                            label = 'api pi',
+                            title = 'the parser again',
+                            status = 'working',
+                            updated_at = '2026-11-07T16:14:00Z',
+                        }),
+                        row({
+                            block_id = 'block:b',
+                            label = 'api claude-code',
+                            title = 'the docs',
+                            status = 'done',
+                            updated_at = '2026-11-07T16:00:00Z',
+                        }),
+                    },
+                }),
+            }
+            local out = build(sessions, { git = { ['block:a'] = '2+ 1-' } })
+            assert.are.same({
+                '+ orbit',
+                '  + done     the docs',
+                '                    api claude-code  15m',
+                '  * working  the parser again',
+                '             2+ 1-  api pi           1m',
+            }, out.lines)
         end)
 
         it('adds an empty header for a Home session the model lacks', function()
@@ -331,7 +369,7 @@ describe('ui.render', function()
                     },
                 }),
             }
-            assert.are.equal(3, #build(sessions).lines)
+            assert.are.equal(5, #build(sessions).lines)
         end)
 
         it('hides exited rows when show_exited is false', function()
@@ -345,7 +383,7 @@ describe('ui.render', function()
                 }),
             }
             local out = build(sessions, { show_exited = false })
-            assert.are.equal(2, #out.lines)
+            assert.are.equal(3, #out.lines)
             assert.are.equal('+ orbit', out.lines[1])
             assert.are.same({ 'block:a' }, {
                 targets_of(out, 'row')[1].block_id,
@@ -384,6 +422,8 @@ describe('ui.render', function()
                 window_id = 'window:w1',
                 block_id = 'block:b1',
             }, out.targets[2])
+            -- A row takes two lines, and both carry its target.
+            assert.are.same(out.targets[2], out.targets[3])
         end)
 
         it('says why a Session could not be read', function()
@@ -411,7 +451,7 @@ describe('ui.render', function()
             assert.are.equal(1, span.line)
             assert.are.equal(0, span.col_start)
             assert.are.equal(#out.lines[1], span.col_end)
-            assert.are.equal(3, #out.lines)
+            assert.are.equal(4, #out.lines)
             assert.are.equal('session', out.targets[2].kind)
         end)
 
@@ -437,9 +477,9 @@ describe('ui.render', function()
                 session({ id = 'session:b', rows = { row({}) } }),
             }
             local out = build(sessions)
-            assert.are.equal(5, #out.lines)
-            assert.are.equal('', out.lines[3])
-            assert.is_nil(out.targets[3])
+            assert.are.equal(7, #out.lines)
+            assert.are.equal('', out.lines[4])
+            assert.is_nil(out.targets[4])
             assert.are.equal('session:a session:b', labels_of(out))
         end)
 
@@ -461,9 +501,10 @@ describe('ui.render', function()
             local status_span = assert(row_status(out, 2))
             assert.are.equal('needs input', text_of(out, status_span))
             assert.are.equal('RexaiNeedsInput', status_span.group)
-            -- The status comes right after the glyph, the age ends the row.
+            -- The status comes right after the glyph, the age ends the second
+            -- line of the row.
             assert.are.equal(spans[1].col_end + 1, status_span.col_start)
-            assert.are.equal('pi 2c3d  42s', out.lines[2]:match('pi 2c3d.*$'))
+            assert.are.equal('pi 2c3d  42s', out.lines[3]:match('pi 2c3d.*$'))
         end)
 
         it('shows the exit code of an exited row', function()
@@ -491,8 +532,8 @@ describe('ui.render', function()
         it('shows no age without a time', function()
             local sessions = { session({ rows = { row({}) } }) }
             local out = build(sessions)
-            assert.is_nil(out.lines[2]:find(' $'))
-            assert.is_truthy(out.lines[2]:find('pi 2c3d$'))
+            assert.is_nil(out.lines[3]:find(' $'))
+            assert.is_truthy(out.lines[3]:find('pi 2c3d$'))
         end)
 
         it('shows now for a fresh status', function()
@@ -506,7 +547,7 @@ describe('ui.render', function()
                     },
                 }),
             }
-            assert.are.equal('now', build(sessions).lines[2]:match('%S+$'))
+            assert.are.equal('now', build(sessions).lines[3]:match('%S+$'))
         end)
 
         it('sanitises a title', function()
@@ -557,45 +598,42 @@ describe('ui.render', function()
             )
         end)
 
-        it('pads every row to the widest value of a column', function()
+        -- The age follows the label column, so it starts on the same display
+        -- column on the second line of every row when the labels differ.
+        ---@param label string
+        local function age_column(label)
+            local stamp = '2026-11-07T16:14:00Z'
             local sessions = {
                 session({
                     rows = {
-                        row({ block_id = 'block:a', label = 'pi', title = 'x' }),
+                        row({
+                            block_id = 'block:a',
+                            label = 'pi',
+                            updated_at = stamp,
+                        }),
                         row({
                             block_id = 'block:b',
-                            label = 'long-label',
-                            title = 'y',
+                            label = label,
+                            updated_at = stamp,
                         }),
                     },
                 }),
             }
             local out = build(sessions)
-            local first = assert(find(out, 'RexaiDim', 'x'))
-            local second = assert(find(out, 'RexaiDim', 'y'))
-            assert.are.equal(first.col_start, second.col_start)
+            local first = assert(out.lines[3]:find('1m', 1, true))
+            local second = assert(out.lines[5]:find('1m', 1, true))
+            assert.are.equal(
+                vim.api.nvim_strwidth(out.lines[3]:sub(1, first - 1)),
+                vim.api.nvim_strwidth(out.lines[5]:sub(1, second - 1))
+            )
+        end
+
+        it('pads every row to the widest value of a column', function()
+            age_column('long-label')
         end)
 
         it('counts a column in display cells', function()
-            local sessions = {
-                session({
-                    rows = {
-                        row({ block_id = 'block:a', label = 'pi', title = 'x' }),
-                        row({
-                            block_id = 'block:b',
-                            label = '中中',
-                            title = 'y',
-                        }),
-                    },
-                }),
-            }
-            local out = build(sessions)
-            local first = assert(find(out, 'RexaiDim', 'x'))
-            local second = assert(find(out, 'RexaiDim', 'y'))
-            assert.are.equal(
-                vim.api.nvim_strwidth(out.lines[2]:sub(1, first.col_start)),
-                vim.api.nvim_strwidth(out.lines[3]:sub(1, second.col_start))
-            )
+            age_column('中中')
         end)
 
         it('keeps a blank git slot at its width', function()
@@ -612,12 +650,12 @@ describe('ui.render', function()
 
             -- The label follows the git column, so it starts at the same
             -- place on both rows and further right than without git.
-            local first = with.lines[2]:find('pi 2c3d', 1, true)
-            local second = with.lines[3]:find('pi 2c3d', 1, true)
+            local first = with.lines[3]:find('pi 2c3d', 1, true)
+            local second = with.lines[5]:find('pi 2c3d', 1, true)
             assert.are.equal(first, second)
-            assert.is_true(first > without.lines[2]:find('pi 2c3d', 1, true))
-            assert.is_nil(with.lines[3]:find('main', 1, true))
-            assert.is_truthy(with.lines[2]:find('main*', 1, true))
+            assert.is_true(first > without.lines[3]:find('pi 2c3d', 1, true))
+            assert.is_nil(with.lines[5]:find('main', 1, true))
+            assert.is_truthy(with.lines[3]:find('main*', 1, true))
         end)
 
         it('uses the configured glyphs', function()

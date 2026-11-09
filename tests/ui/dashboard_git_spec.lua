@@ -82,11 +82,12 @@ describe('ui.dashboard git slot', function()
     end)
 
     ---@param needle string
-    ---@return string|nil the Dashboard line holding it
-    local function line_with(needle)
-        for _, line in ipairs(h:lines()) do
+    ---@return string|nil the line under the one holding it
+    local function line_below(needle)
+        local lines = h:lines()
+        for index, line in ipairs(lines) do
             if line:find(needle, 1, true) then
-                return line
+                return lines[index + 1]
             end
         end
         return nil
@@ -124,17 +125,17 @@ describe('ui.dashboard git slot', function()
         open_with(SNAPSHOT)
 
         assert.are.same(without_git.lines, h:lines())
-        local before = assert(line_with('the docs'))
+        local before = assert(line_below('the docs'))
         assert.is_nil(before:find('orbit · main', 1, true))
         assert.is_nil(before:find('orbit', 1, true))
 
         h.git.answer(CLEAN, ROOT)
         support.flush()
 
-        local after = assert(line_with('the docs'))
+        local after = assert(line_below('the docs'))
         assert.is_truthy(after:find('orbit · main', 1, true))
         -- The row without a directory gets no slot and no git call.
-        local plain = assert(line_with('the parser'))
+        local plain = assert(line_below('the parser'))
         assert.is_nil(plain:find('orbit', 1, true))
         assert.are.equal(1, status_calls())
     end)
@@ -143,7 +144,7 @@ describe('ui.dashboard git slot', function()
         open_with(SNAPSHOT)
         h.git.answer(CLEAN, ROOT)
         support.flush()
-        local before = assert(line_with('the docs'))
+        local before = assert(line_below('the docs'))
         assert.is_truthy(before:find('orbit · main', 1, true))
 
         h.clock.advance(5000)
@@ -151,7 +152,7 @@ describe('ui.dashboard git slot', function()
         h.git.answer(DIRTY, ROOT)
         support.flush()
 
-        local after = assert(line_with('the docs'))
+        local after = assert(line_below('the docs'))
         assert.are_not.equal(before, after)
         assert.is_truthy(after:find('orbit · main ●3', 1, true))
     end)
@@ -186,7 +187,7 @@ describe('ui.dashboard git slot', function()
         h.git.next().callback('git exited with code 128')
         support.flush()
 
-        local line = assert(line_with('the docs'))
+        local line = assert(line_below('the docs'))
         assert.is_nil(line:find('orbit', 1, true))
         assert.is_nil(line:find('●', 1, true))
 

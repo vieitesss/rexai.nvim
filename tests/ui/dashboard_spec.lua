@@ -456,9 +456,34 @@ describe('ui.dashboard', function()
             end
         )
 
+        it(
+            'keeps a cursor on the second line of a row when the row moves',
+            function()
+                h:open({
+                    snapshots = { FIRST, SECOND },
+                    home_session_id = HOME,
+                })
+                local win = vim.api.nvim_get_current_win()
+                local before = expected(FIRST, { home_session_id = HOME })
+                local line = support.line_of(before.targets, 'block:b1')
+                vim.api.nvim_win_set_cursor(win, { line + 1, 0 })
+
+                h.timer.fire()
+
+                local after = expected(SECOND, { home_session_id = HOME })
+                local moved = support.line_of(after.targets, 'block:b1')
+                assert.is_true(moved ~= line)
+                assert.are.equal(moved + 1, vim.api.nvim_win_get_cursor(win)[1])
+                assert.are.equal(
+                    'block:b1',
+                    dashboard.current_target(win).block_id
+                )
+            end
+        )
+
         it('keeps the line number when the row is gone', function()
-            -- `block:b1` leaves Rex: its row is gone and the buffer is one
-            -- line shorter than the cursor.
+            -- `block:b1` leaves Rex: its row is gone and the buffer ends
+            -- above the line the cursor was on.
             local only = snapshot_of('session:s1', {
                 blocks = {
                     {
@@ -477,12 +502,12 @@ describe('ui.dashboard', function()
                 support.line_of(before.targets, 'block:b1'),
                 0,
             })
-            assert.are.equal(3, #h:lines())
+            assert.are.equal(5, #h:lines())
 
             h.timer.fire()
 
-            assert.are.equal(2, #h:lines())
-            assert.are.equal(2, vim.api.nvim_win_get_cursor(win)[1])
+            assert.are.equal(3, #h:lines())
+            assert.are.equal(3, vim.api.nvim_win_get_cursor(win)[1])
         end)
     end)
 end)
